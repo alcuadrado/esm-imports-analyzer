@@ -876,6 +876,15 @@ function initGraph(data) {
     }
   });
 
+  cy.on('dbltap', function (e) {
+    if (e.target === cy) {
+      cy.nodes().unselect();
+      clearSelectionHighlight(cy);
+      cy.elements().removeClass('cycle-highlight');
+      cy.animate({ fit: { eles: cy.elements(), padding: 30 }, duration: 300 });
+    }
+  });
+
   // Context menu (right-click)
   var ctxMenu = document.createElement('div');
   ctxMenu.className = 'graph-context-menu';
