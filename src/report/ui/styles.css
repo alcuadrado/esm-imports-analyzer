@@ -434,8 +434,8 @@ body {
 }
 
 .col-module { flex: 1; }
-.col-time { width: 120px; text-align: right; font-family: var(--font-mono); }
-.col-imports { width: 100px; text-align: right; font-family: var(--font-mono); }
+.col-time { width: 120px; text-align: right; justify-content: flex-end; font-family: var(--font-mono); }
+.col-imports { width: 100px; text-align: right; justify-content: flex-end; font-family: var(--font-mono); }
 
 .table-body {
   overflow-y: auto;
