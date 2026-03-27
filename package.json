@@ -18,11 +18,13 @@
   },
   "types": "dist/cli.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src/report/ui",
+    "src/report/template.html"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "tsc && cp -r src/report/ui dist/report/ui && cp src/report/template.html dist/report/template.html",
     "test": "node --test test/**/*.test.ts",
     "test:unit": "node --test test/unit/**/*.test.ts",
     "test:integration": "node --test test/integration/**/*.test.ts",
