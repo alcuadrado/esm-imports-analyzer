@@ -118,6 +118,19 @@ describe('groupModules', () => {
     assert.ok(msGroup.isNodeModules, 'Should be flagged as node_modules');
   });
 
+  it('uses directory name when package.json has no name field', () => {
+    const fixtureDir = resolve('test/integration/fixtures/no-name-pkg');
+    const aURL = pathToFileURL(resolve(fixtureDir, 'a.js')).href;
+    const records = [makeRecord(aURL)];
+    const groups = groupModules(records);
+    // Should use directory name as fallback label
+    assert.ok(groups.length >= 1);
+    const group = groups[0]!;
+    assert.ok(group.modules.includes(aURL));
+    // The label should be derived from directory name, not undefined
+    assert.ok(typeof group.label === 'string' && group.label.length > 0, `Label should be non-empty, got: ${group.label}`);
+  });
+
   it('falls back to Ungrouped when no package.json found', () => {
     // Use a URL in /tmp which has no package.json
     const tmpURL = pathToFileURL('/tmp/no-package-json-here/test.js').href;

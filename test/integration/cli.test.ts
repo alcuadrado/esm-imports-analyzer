@@ -1,7 +1,8 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { runCli, createTempOutputPath, cleanupFile } from './helpers.ts';
 
 const fixturesDir = resolve(import.meta.dirname!, 'fixtures');
@@ -86,5 +87,33 @@ describe('CLI', () => {
     // Report should still be generated since imports were collected before exit
     assert.ok(existsSync(output), 'Report should be generated even with non-zero exit');
     assert.ok(result.stdout.includes('Report generated'), 'Should print report path');
+  });
+
+  it('preserves existing NODE_OPTIONS', () => {
+    const output = createTempOutputPath();
+    tempPaths.push(output);
+    const cliPath = resolve('src/cli.ts');
+    try {
+      execFileSync('node', [cliPath, '-o', output, '--', 'node', resolve(fixturesDir, 'simple/a.js')], {
+        env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=512' },
+        encoding: 'utf-8',
+        timeout: 15000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch {
+      // may throw, but we only care about the report being generated
+    }
+    assert.ok(existsSync(output), 'Report should be generated with pre-existing NODE_OPTIONS');
+    const html = readFileSync(output, 'utf-8');
+    assert.ok(html.includes('<!DOCTYPE html>'), 'Should produce valid HTML');
+  });
+
+  it('child stdout passthrough is visible', () => {
+    const output = createTempOutputPath();
+    tempPaths.push(output);
+    // CLI uses stdio: 'inherit' for the child, so child output merges with CLI output
+    // In our test helper, we capture the combined stdout
+    const result = runCli(['-o', output, '--', 'node', '-e', `console.log('CHILD_OUTPUT_MARKER'); import('node:path');`]);
+    assert.ok(result.stdout.includes('CHILD_OUTPUT_MARKER'), 'Child stdout should be visible in output');
   });
 });

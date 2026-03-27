@@ -54,6 +54,15 @@ body {
   font-size: 12px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timing-note {
+  cursor: help;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 .header-controls {
