@@ -874,15 +874,4 @@ function filterBySearch(cy, query) {
   });
 }
 
-function filterByThreshold(cy, minTime) {
-  cy.nodes('.module').forEach(function (node) {
-    if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
-    var fid = parentFolderOf[node.id()];
-    if (fid && !expandedFolders.has(fid)) return;
-    if (node.data('totalTime') < minTime) {
-      node.hide();
-    } else {
-      node.show();
-    }
-  });
-}
+

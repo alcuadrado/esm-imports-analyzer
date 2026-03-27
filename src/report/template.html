@@ -25,11 +25,6 @@
       <div class="filter-group">
         <input type="text" class="search-input" id="search-input" placeholder="Search modules...">
       </div>
-      <div class="filter-group">
-        <label>Min time:</label>
-        <input type="range" class="threshold-slider" id="time-threshold" min="0" max="1000" value="0" step="1">
-        <span class="threshold-label" id="threshold-value">0 ms</span>
-      </div>
     </div>
   </div>
 
@@ -93,10 +88,6 @@
       document.getElementById('meta-command').textContent = data.metadata.command;
       document.getElementById('meta-modules').textContent = data.metadata.totalModules;
       document.getElementById('meta-time').textContent = data.metadata.totalTime.toFixed(1) + ' ms';
-
-      // Set threshold slider max
-      var slider = document.getElementById('time-threshold');
-      slider.max = Math.ceil(data.metadata.totalTime);
 
       // Init components
       var cy = initGraph(data);

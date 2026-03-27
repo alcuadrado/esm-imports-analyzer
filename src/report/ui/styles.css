@@ -122,17 +122,6 @@ body {
   border-color: var(--accent);
 }
 
-.threshold-slider {
-  width: 100px;
-}
-
-.threshold-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  min-width: 50px;
-}
-
 /* Main layout */
 .main-container {
   display: flex;
