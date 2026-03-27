@@ -114,54 +114,104 @@ function runLayout(cy, callback) {
   });
 }
 
-// Collapse a group: hide its children and their internal edges
-function collapseGroup(cy, groupNode) {
-  var groupId = groupNode.id();
-  collapsedGroups.add(groupId);
-  groupNode.addClass('collapsed');
-
+// Recompute which edges are visible and create/remove meta-edges between
+// collapsed groups.  Call after any collapse/expand change.
+function refreshEdgeVisibility(cy) {
   cy.batch(function () {
-    // Hide child module nodes
-    groupNode.children().hide();
-    // Hide edges whose both endpoints are inside this group
-    groupNode.children().connectedEdges().forEach(function (edge) {
-      var srcParent = edge.source().parent();
-      var tgtParent = edge.target().parent();
-      var srcInGroup = srcParent.length > 0 && srcParent.id() === groupId;
-      var tgtInGroup = tgtParent.length > 0 && tgtParent.id() === groupId;
-      // Hide edge if either endpoint is a hidden child of this group
-      if (srcInGroup || tgtInGroup) {
-        edge.hide();
+    // Remove old meta-edges
+    cy.edges('.meta-edge').remove();
+
+    // Decide visibility for every real edge and collect meta-edge needs
+    var metaEdges = {};  // key "srcGroup->tgtGroup", value { source, target, count }
+
+    cy.edges().forEach(function (edge) {
+      var src = edge.source();
+      var tgt = edge.target();
+      var srcGroup = src.parent().length > 0 ? src.parent() : null;
+      var tgtGroup = tgt.parent().length > 0 ? tgt.parent() : null;
+      var srcCollapsed = srcGroup && collapsedGroups.has(srcGroup.id());
+      var tgtCollapsed = tgtGroup && collapsedGroups.has(tgtGroup.id());
+
+      if (!srcCollapsed && !tgtCollapsed) {
+        // Both endpoints visible — show the real edge if endpoints are visible
+        if (src.visible() && tgt.visible()) {
+          edge.show();
+        } else {
+          edge.hide();
+        }
+        return;
       }
+
+      // At least one side collapsed — hide the real edge, need a meta-edge
+      edge.hide();
+
+      var effectiveSrc = srcCollapsed ? srcGroup.id() : src.id();
+      var effectiveTgt = tgtCollapsed ? tgtGroup.id() : tgt.id();
+
+      // Skip self-loops on the same collapsed group
+      if (effectiveSrc === effectiveTgt) return;
+
+      var key = effectiveSrc + '||' + effectiveTgt;
+      if (!metaEdges[key]) {
+        metaEdges[key] = { source: effectiveSrc, target: effectiveTgt, count: 0 };
+      }
+      metaEdges[key].count++;
     });
+
+    // Add meta-edges
+    var toAdd = [];
+    var keys = Object.keys(metaEdges);
+    for (var i = 0; i < keys.length; i++) {
+      var me = metaEdges[keys[i]];
+      toAdd.push({
+        group: 'edges',
+        data: {
+          id: 'meta-' + keys[i],
+          source: me.source,
+          target: me.target,
+          specifier: me.count + ' imports',
+        },
+        classes: 'meta-edge',
+      });
+    }
+    if (toAdd.length > 0) cy.add(toAdd);
   });
 }
 
-// Expand a group: show its children and reconnect edges
-function expandGroup(cy, groupNode) {
-  var groupId = groupNode.id();
-  collapsedGroups.delete(groupId);
-  groupNode.removeClass('collapsed');
+// Collapse a group: hide its children, refresh edges
+function collapseGroup(cy, groupNode) {
+  collapsedGroups.add(groupNode.id());
+  groupNode.addClass('collapsed');
+  cy.batch(function () {
+    groupNode.children().hide();
+  });
+  refreshEdgeVisibility(cy);
+}
 
+// Expand a group: show its children, refresh edges
+function expandGroup(cy, groupNode) {
+  collapsedGroups.delete(groupNode.id());
+  groupNode.removeClass('collapsed');
   cy.batch(function () {
     groupNode.children().forEach(function (child) {
-      // Don't show builtins unless toggle is on
       if (child.hasClass('builtin') && !document.getElementById('show-builtins').checked) return;
       child.show();
     });
-    // Re-show edges where both endpoints are now visible
-    groupNode.children().connectedEdges().forEach(function (edge) {
-      if (edge.source().visible() && edge.target().visible()) {
-        edge.show();
-      }
-    });
   });
+  refreshEdgeVisibility(cy);
 }
 
 function collapseAll(cy) {
   cy.nodes('.group').forEach(function (groupNode) {
-    collapseGroup(cy, groupNode);
+    collapsedGroups.add(groupNode.id());
+    groupNode.addClass('collapsed');
   });
+  cy.batch(function () {
+    cy.nodes('.group').forEach(function (groupNode) {
+      groupNode.children().hide();
+    });
+  });
+  refreshEdgeVisibility(cy);
 }
 
 function initGraph(data) {
@@ -362,6 +412,22 @@ function initGraph(data) {
           'taxi-direction': 'downward',
           'taxi-turn': '20px',
           'arrow-scale': 0.7,
+        },
+      },
+      {
+        selector: 'edge.meta-edge',
+        style: {
+          'width': 2,
+          'line-color': '#7f849c',
+          'target-arrow-color': '#7f849c',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'arrow-scale': 0.8,
+          'label': 'data(specifier)',
+          'font-size': '9px',
+          'color': '#6c7086',
+          'text-rotation': 'autorotate',
+          'text-margin-y': '-8px',
         },
       },
       {
