@@ -224,7 +224,8 @@ function expandGroup(cy, groupNode) {
   groupNode.removeClass('collapsed');
   cy.batch(function () {
     groupNode.children().forEach(function (child) {
-      if (child.hasClass('builtin') && !document.getElementById('show-builtins').checked) return;
+
+
       child.show();
     });
   });
@@ -622,8 +623,7 @@ function initGraph(data) {
     maxZoom: 5,
   });
 
-  // Hide builtins, then collapse all groups, then run initial layout
-  cy.nodes('.builtin').hide();
+  // Collapse all groups then run initial layout
   collapseAll(cy);
   runLayout(cy);
 
@@ -771,25 +771,10 @@ function zoomToNode(cy, resolvedURL) {
   }
 }
 
-function toggleBuiltins(cy, show) {
-  if (show) {
-    cy.nodes('.builtin').forEach(function (node) {
-      // Only show if parent group is expanded
-      if (node.parent().length === 0 || !collapsedGroups.has(node.parent().id())) {
-        node.show();
-      }
-    });
-  } else {
-    cy.nodes('.builtin').hide();
-  }
-}
-
 function filterBySearch(cy, query) {
   if (!query) {
     cy.nodes('.module').forEach(function (node) {
-      // Respect collapsed state
       if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
-      if (node.hasClass('builtin') && !document.getElementById('show-builtins').checked) return;
       node.show();
     });
     return;
@@ -813,7 +798,6 @@ function filterByThreshold(cy, minTime) {
     if (node.data('totalTime') < minTime) {
       node.hide();
     } else {
-      if (node.hasClass('builtin') && !document.getElementById('show-builtins').checked) return;
       node.show();
     }
   });
