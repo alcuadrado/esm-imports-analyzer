@@ -975,7 +975,14 @@ function highlightCycle(cy, cycle) {
       for (var j = 0; j < nodes.length; j++) {
         collection = collection.union(nodes[j]);
       }
-      cy.animate({ fit: { eles: collection, padding: 60 }, duration: 300 });
+      // Also include the parent groups so the zoom shows context
+      var withParents = collection;
+      collection.forEach(function (n) {
+        if (n.parent().length > 0) {
+          withParents = withParents.union(n.parent());
+        }
+      });
+      cy.animate({ fit: { eles: withParents, padding: 40 }, duration: 300 });
     }
   });
 }
