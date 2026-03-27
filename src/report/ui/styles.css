@@ -427,6 +427,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .table-header-row span:hover {

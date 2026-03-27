@@ -321,12 +321,14 @@ function revealModule(cy, moduleURL) {
 
 function collapseAll(cy) {
   cy.nodes('.group').forEach(function (groupNode) {
+    if (groupNode.data('moduleCount') <= 1) return;
     collapsedGroups.add(groupNode.id());
     groupNode.addClass('collapsed');
   });
   expandedFolders.clear();
   cy.batch(function () {
     cy.nodes('.group').forEach(function (groupNode) {
+      if (groupNode.data('moduleCount') <= 1) return;
       groupNode.children().hide();
     });
   });
@@ -778,6 +780,7 @@ function initGraph(data) {
   cy.on('dbltap', 'node', function (e) {
     var node = e.target;
     if (node.hasClass('group')) {
+      if (node.data('moduleCount') <= 1) return;
       if (collapsedGroups.has(node.id())) {
         expandGroup(cy, node);
       } else {
