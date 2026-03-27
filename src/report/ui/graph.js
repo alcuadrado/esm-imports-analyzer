@@ -914,7 +914,14 @@ function initGraph(data) {
     item.className = 'graph-context-menu-item';
     item.textContent = 'Copy absolute path';
     item.addEventListener('click', function () {
-      navigator.clipboard.writeText(path);
+      var ta = document.createElement('textarea');
+      ta.value = path;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
       hideContextMenu();
     });
     ctxMenu.appendChild(item);
