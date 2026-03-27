@@ -79,9 +79,12 @@ function findPackageJson(dir: string): PackageJsonInfo | null {
 
 export function groupModules(records: ImportRecord[]): Group[] {
   const groupMap = new Map<string, Group>();
+  const seenURLs = new Set<string>();
 
   for (const record of records) {
     const url = record.resolvedURL;
+    if (seenURLs.has(url)) continue;
+    seenURLs.add(url);
 
     // Handle node: builtins
     if (url.startsWith('node:')) {
