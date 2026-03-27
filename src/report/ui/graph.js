@@ -360,34 +360,26 @@ function applySelectionHighlight(cy) {
 
   var highlighted = cy.collection();
 
-  selected.forEach(function (node) {
-    // Expanded group: purple border, don't dim contents
-    var isExpandedGroup = node.hasClass('group') && !collapsedGroups.has(node.id());
-    if (isExpandedGroup) {
-      node.addClass('hl-selected-parent');
-      highlighted = highlighted.union(node);
-      // Include all visible children so they won't be dimmed
-      node.children(':visible').forEach(function (child) {
-        highlighted = highlighted.union(child);
-      });
-    } else {
-      node.addClass('hl-selected');
-      highlighted = highlighted.union(node);
-    }
+  function isSelectedOrParent(n) {
+    return n.hasClass('hl-selected') || n.hasClass('hl-selected-parent');
+  }
 
+  function traceEdges(node) {
+    // Outgoing edges from this node
     var outEdges = node.outgoers('edge:visible');
     outEdges.addClass('hl-outgoing');
     highlighted = highlighted.union(outEdges);
     outEdges.targets().forEach(function (t) {
-      if (!t.hasClass('hl-selected') && !t.hasClass('hl-selected-parent')) t.addClass('hl-outgoing');
+      if (!isSelectedOrParent(t)) t.addClass('hl-outgoing');
       highlighted = highlighted.union(t);
     });
 
+    // Incoming edges to this node
     var inEdges = node.incomers('edge:visible');
     inEdges.addClass('hl-incoming');
     highlighted = highlighted.union(inEdges);
     inEdges.sources().forEach(function (s) {
-      if (!s.hasClass('hl-selected') && !s.hasClass('hl-selected-parent') && !s.hasClass('hl-outgoing')) s.addClass('hl-incoming');
+      if (!isSelectedOrParent(s) && !s.hasClass('hl-outgoing')) s.addClass('hl-incoming');
       highlighted = highlighted.union(s);
     });
 
@@ -397,20 +389,43 @@ function applySelectionHighlight(cy) {
         var isOut = me.source().id() === node.id();
         if (isOut) {
           me.addClass('hl-outgoing');
-          if (!me.target().hasClass('hl-selected') && !me.target().hasClass('hl-selected-parent')) me.target().addClass('hl-outgoing');
+          if (!isSelectedOrParent(me.target())) me.target().addClass('hl-outgoing');
         } else {
           me.addClass('hl-incoming');
-          if (!me.source().hasClass('hl-selected') && !me.source().hasClass('hl-selected-parent')) me.source().addClass('hl-incoming');
+          if (!isSelectedOrParent(me.source())) me.source().addClass('hl-incoming');
         }
         highlighted = highlighted.union(me).union(me.source()).union(me.target());
       });
+    }
+  }
 
-      // For expanded groups: also include edges between visible children
-      if (isExpandedGroup) {
-        node.children(':visible').connectedEdges(':visible').forEach(function (e) {
-          highlighted = highlighted.union(e);
-        });
-      }
+  selected.forEach(function (node) {
+    var isExpandedGroup = node.hasClass('group') && !collapsedGroups.has(node.id());
+
+    if (isExpandedGroup) {
+      node.addClass('hl-selected-parent');
+    } else {
+      node.addClass('hl-selected');
+    }
+    highlighted = highlighted.union(node);
+
+    // Trace direct edges from this node
+    traceEdges(node);
+
+    if (isExpandedGroup) {
+      // Include all visible children and their internal edges
+      var children = node.children(':visible');
+      children.forEach(function (child) {
+        highlighted = highlighted.union(child);
+      });
+      children.connectedEdges(':visible').forEach(function (e) {
+        highlighted = highlighted.union(e);
+      });
+
+      // Also trace outgoing/incoming from each visible child to external nodes
+      children.forEach(function (child) {
+        traceEdges(child);
+      });
     }
   });
 
