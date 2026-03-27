@@ -46,6 +46,7 @@ var folderState = {};         // folderNodeId -> { children: FolderTreeNode[], g
 var parentFolderOf = {};      // nodeId (file or folder) -> parent folderNodeId | null
 var expandedFolders = new Set();
 var suppressAutoSelect = false;
+var cycleEdgeSet = new Set(); // Set of "source->target" edge IDs that are part of cycles
 // Set of group IDs that have folder trees
 var groupsWithFolderTree = new Set();
 
@@ -370,7 +371,7 @@ function expandAll(cy) {
 }
 
 // --- Directional selection highlighting ---
-var HL_CLASSES = ['hl-selected', 'hl-outgoing', 'hl-incoming', 'dimmed'];
+var HL_CLASSES = ['hl-selected', 'hl-outgoing', 'hl-incoming', 'hl-cycle', 'dimmed'];
 
 function clearSelectionHighlight(cy) {
   for (var i = 0; i < HL_CLASSES.length; i++) {
@@ -453,6 +454,13 @@ function applySelectionHighlight(cy) {
       children.forEach(function (child) {
         traceEdges(child);
       });
+    }
+  });
+
+  // Mark cycle edges among the highlighted edges
+  highlighted.edges().forEach(function (edge) {
+    if (cycleEdgeSet.has(edge.id())) {
+      edge.addClass('hl-cycle');
     }
   });
 
@@ -599,6 +607,18 @@ function initGraph(data) {
           specifier: eMod.specifier,
         },
       });
+    }
+  }
+
+  // Build cycle edge lookup
+  cycleEdgeSet.clear();
+  if (data.cycles) {
+    for (var ci = 0; ci < data.cycles.length; ci++) {
+      var cycle = data.cycles[ci];
+      for (var cj = 0; cj < cycle.modules.length; cj++) {
+        var nextIdx = (cj + 1) % cycle.modules.length;
+        cycleEdgeSet.add(cycle.modules[cj] + '->' + cycle.modules[nextIdx]);
+      }
     }
   }
 
@@ -753,6 +773,10 @@ function initGraph(data) {
       {
         selector: 'edge.hl-incoming',
         style: { 'line-color': '#a6e3a1', 'target-arrow-color': '#a6e3a1', 'width': 2, 'z-index': 5 },
+      },
+      {
+        selector: 'edge.hl-cycle',
+        style: { 'line-color': '#f9e2af', 'target-arrow-color': '#f9e2af', 'width': 2, 'z-index': 6 },
       },
       {
         selector: 'node.dimmed',
