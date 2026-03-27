@@ -37,8 +37,15 @@ var DAGRE_WORKER_SRC = [
 ].join('\n');
 
 var layoutOverlay = null;
-// Track which groups are collapsed. Key = group node id, value = true if collapsed.
 var collapsedGroups = new Set();
+
+// Folder tree state
+var groupFolderTrees = {};   // groupId -> FolderTreeNode[] (top-level children)
+var folderState = {};         // folderNodeId -> { children: FolderTreeNode[], groupId: string }
+var parentFolderOf = {};      // nodeId (file or folder) -> parent folderNodeId | null
+var expandedFolders = new Set();
+// Set of group IDs that have folder trees
+var groupsWithFolderTree = new Set();
 
 function showOverlay() {
   if (!layoutOverlay) layoutOverlay = document.getElementById('layout-overlay');
@@ -53,25 +60,19 @@ function hideOverlay() {
 function runLayout(cy, callback) {
   showOverlay();
 
-  // Extract visible graph data for the worker
   var nodes = [];
   var edges = [];
   var visibleNodeIds = new Set();
-  // Track which visible group nodes are expanded (have visible children).
-  // Expanded groups should NOT be sent as dagre nodes — cytoscape auto-sizes
-  // them to wrap their children.  Only collapsed groups act as leaf nodes.
   var expandedGroupIds = new Set();
 
   cy.nodes(':visible').forEach(function (node) {
     var isGroup = node.hasClass('group');
     if (isGroup && !collapsedGroups.has(node.id())) {
-      // Expanded group — skip it; dagre will use it only as a compound parent
       expandedGroupIds.add(node.id());
       visibleNodeIds.add(node.id());
       return;
     }
     visibleNodeIds.add(node.id());
-    // For child nodes inside an expanded group, tell dagre about the parent
     var parentId = null;
     if (node.parent().length > 0 && expandedGroupIds.has(node.parent().id())) {
       parentId = node.parent().id();
@@ -84,25 +85,13 @@ function runLayout(cy, callback) {
     });
   });
 
-  // Also add expanded groups as dagre compound parents (no width/height — dagre
-  // will size them from their children)
   expandedGroupIds.forEach(function (gid) {
-    nodes.push({
-      id: gid,
-      width: 0,
-      height: 0,
-      parent: null,
-      isCompound: true,
-    });
+    nodes.push({ id: gid, width: 0, height: 0, parent: null });
   });
 
   cy.edges(':visible').forEach(function (edge) {
     if (visibleNodeIds.has(edge.source().id()) && visibleNodeIds.has(edge.target().id())) {
-      edges.push({
-        id: edge.id(),
-        source: edge.source().id(),
-        target: edge.target().id(),
-      });
+      edges.push({ id: edge.id(), source: edge.source().id(), target: edge.target().id() });
     }
   });
 
@@ -114,7 +103,6 @@ function runLayout(cy, callback) {
     var positions = e.data;
     cy.batch(function () {
       cy.nodes().forEach(function (node) {
-        // Never set position on expanded group nodes — let cytoscape auto-size
         if (expandedGroupIds.has(node.id())) return;
         var pos = positions[node.id()];
         if (pos) node.position(pos);
@@ -134,51 +122,51 @@ function runLayout(cy, callback) {
     if (callback) callback();
   };
 
-  worker.postMessage({
-    nodes: nodes,
-    edges: edges,
-    rankDir: 'TB',
-    nodeSep: 40,
-    edgeSep: 10,
-    rankSep: 60,
-  });
+  worker.postMessage({ nodes: nodes, edges: edges, rankDir: 'TB', nodeSep: 40, edgeSep: 10, rankSep: 60 });
 }
 
-// Recompute which edges are visible and create/remove meta-edges between
-// collapsed groups.  Call after any collapse/expand change.
+// Resolve a module URL to its nearest visible ancestor node ID.
+// Walks: module -> parent folder -> ... -> parent group
+function resolveVisibleNode(cy, moduleURL) {
+  // Check if the module node itself is visible
+  var node = cy.getElementById(moduleURL);
+  if (node.length > 0 && node.visible()) return moduleURL;
+
+  // Walk up through parent folders
+  var folderId = parentFolderOf[moduleURL];
+  while (folderId) {
+    var folderNode = cy.getElementById(folderId);
+    if (folderNode.length > 0 && folderNode.visible()) return folderId;
+    folderId = parentFolderOf[folderId];
+  }
+
+  // Fall back to parent group
+  if (node.length > 0 && node.parent().length > 0) return node.parent().id();
+  return moduleURL;
+}
+
 function refreshEdgeVisibility(cy) {
   cy.batch(function () {
-    // Remove old meta-edges
     cy.edges('.meta-edge').remove();
 
-    // Decide visibility for every real edge and collect meta-edge needs
-    var metaEdges = {};  // key "srcGroup->tgtGroup", value { source, target, count }
+    var metaEdges = {};
 
     cy.edges().forEach(function (edge) {
-      var src = edge.source();
-      var tgt = edge.target();
-      var srcGroup = src.parent().length > 0 ? src.parent() : null;
-      var tgtGroup = tgt.parent().length > 0 ? tgt.parent() : null;
-      var srcCollapsed = srcGroup && collapsedGroups.has(srcGroup.id());
-      var tgtCollapsed = tgtGroup && collapsedGroups.has(tgtGroup.id());
+      var srcId = edge.source().id();
+      var tgtId = edge.target().id();
 
-      if (!srcCollapsed && !tgtCollapsed) {
-        // Both endpoints visible — show the real edge if endpoints are visible
-        if (src.visible() && tgt.visible()) {
-          edge.show();
-        } else {
-          edge.hide();
-        }
+      var effectiveSrc = resolveVisibleNode(cy, srcId);
+      var effectiveTgt = resolveVisibleNode(cy, tgtId);
+
+      // Both resolved to themselves = both visible, show the real edge
+      if (effectiveSrc === srcId && effectiveTgt === tgtId) {
+        edge.show();
         return;
       }
 
-      // At least one side collapsed — hide the real edge, need a meta-edge
+      // At least one resolved to a different node — hide real edge, collect meta-edge
       edge.hide();
 
-      var effectiveSrc = srcCollapsed ? srcGroup.id() : src.id();
-      var effectiveTgt = tgtCollapsed ? tgtGroup.id() : tgt.id();
-
-      // Skip self-loops on the same collapsed group
       if (effectiveSrc === effectiveTgt) return;
 
       var key = effectiveSrc + '||' + effectiveTgt;
@@ -188,7 +176,6 @@ function refreshEdgeVisibility(cy) {
       metaEdges[key].count++;
     });
 
-    // Add meta-edges
     var toAdd = [];
     var keys = Object.keys(metaEdges);
     for (var i = 0; i < keys.length; i++) {
@@ -208,28 +195,92 @@ function refreshEdgeVisibility(cy) {
   });
 }
 
-// Collapse a group: hide its children, refresh edges
-function collapseGroup(cy, groupNode) {
-  collapsedGroups.add(groupNode.id());
-  groupNode.addClass('collapsed');
-  cy.batch(function () {
-    groupNode.children().hide();
-  });
-  refreshEdgeVisibility(cy);
-}
-
-// Expand a group: show its children, refresh edges
+// Expand a group: show top-level folder tree children (or all children if no tree)
 function expandGroup(cy, groupNode) {
   collapsedGroups.delete(groupNode.id());
   groupNode.removeClass('collapsed');
+
+  var gid = groupNode.data('groupId');
+  var tree = groupFolderTrees[gid];
+
   cy.batch(function () {
-    groupNode.children().forEach(function (child) {
-
-
-      child.show();
-    });
+    if (tree && tree.length > 0) {
+      // Show only top-level folder tree children
+      for (var i = 0; i < tree.length; i++) {
+        cy.getElementById(tree[i].id).show();
+      }
+    } else {
+      // No folder tree — show all children flat
+      groupNode.children().show();
+    }
   });
+
   refreshEdgeVisibility(cy);
+}
+
+// Collapse a group: hide ALL children, reset folder expansion state
+function collapseGroup(cy, groupNode) {
+  collapsedGroups.add(groupNode.id());
+  groupNode.addClass('collapsed');
+
+  var gid = groupNode.data('groupId');
+
+  cy.batch(function () {
+    groupNode.children().hide();
+  });
+
+  // Reset folder expansion state for this group
+  var toDelete = [];
+  expandedFolders.forEach(function (fid) {
+    var fs = folderState[fid];
+    if (fs && fs.groupId === gid) toDelete.push(fid);
+  });
+  for (var i = 0; i < toDelete.length; i++) {
+    expandedFolders.delete(toDelete[i]);
+  }
+
+  refreshEdgeVisibility(cy);
+}
+
+// Expand a folder: hide the folder node, show its children
+function expandFolder(cy, folderNodeId) {
+  var state = folderState[folderNodeId];
+  if (!state) return;
+
+  expandedFolders.add(folderNodeId);
+
+  cy.batch(function () {
+    cy.getElementById(folderNodeId).hide();
+    for (var i = 0; i < state.children.length; i++) {
+      cy.getElementById(state.children[i].id).show();
+    }
+  });
+
+  refreshEdgeVisibility(cy);
+  runLayout(cy);
+}
+
+// Ensure a module node is visible by expanding its group and ancestor folders
+function revealModule(cy, moduleURL) {
+  var node = cy.getElementById(moduleURL);
+  if (node.length === 0) return;
+
+  // Expand parent group if collapsed
+  if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) {
+    expandGroup(cy, node.parent());
+  }
+
+  // Collect ancestor folders that need expanding (outermost first)
+  var chain = [];
+  var fid = parentFolderOf[moduleURL];
+  while (fid) {
+    if (!expandedFolders.has(fid)) chain.push(fid);
+    fid = parentFolderOf[fid];
+  }
+  chain.reverse();
+  for (var i = 0; i < chain.length; i++) {
+    expandFolder(cy, chain[i]);
+  }
 }
 
 function collapseAll(cy) {
@@ -237,6 +288,7 @@ function collapseAll(cy) {
     collapsedGroups.add(groupNode.id());
     groupNode.addClass('collapsed');
   });
+  expandedFolders.clear();
   cy.batch(function () {
     cy.nodes('.group').forEach(function (groupNode) {
       groupNode.children().hide();
@@ -261,7 +313,6 @@ function applySelectionHighlight(cy) {
     return;
   }
 
-  // Clear previous highlight classes (but keep :selected state)
   for (var i = 0; i < HL_CLASSES.length; i++) {
     cy.elements().removeClass(HL_CLASSES[i]);
   }
@@ -272,7 +323,6 @@ function applySelectionHighlight(cy) {
     node.addClass('hl-selected');
     highlighted = highlighted.union(node);
 
-    // Outgoing: edges where this node is the source, and their targets
     var outEdges = node.outgoers('edge:visible');
     outEdges.addClass('hl-outgoing');
     highlighted = highlighted.union(outEdges);
@@ -281,7 +331,6 @@ function applySelectionHighlight(cy) {
       highlighted = highlighted.union(t);
     });
 
-    // Incoming: edges where this node is the target, and their sources
     var inEdges = node.incomers('edge:visible');
     inEdges.addClass('hl-incoming');
     highlighted = highlighted.union(inEdges);
@@ -290,8 +339,8 @@ function applySelectionHighlight(cy) {
       highlighted = highlighted.union(s);
     });
 
-    // For group nodes: also follow meta-edges
-    if (node.hasClass('group')) {
+    // Follow meta-edges for group and folder nodes
+    if (node.hasClass('group') || node.hasClass('folder')) {
       node.connectedEdges('.meta-edge:visible').forEach(function (me) {
         var isOut = me.source().id() === node.id();
         if (isOut) {
@@ -306,14 +355,41 @@ function applySelectionHighlight(cy) {
     }
   });
 
-  // Dim everything not highlighted
   cy.elements().not(highlighted).addClass('dimmed');
-  // Don't dim parent groups of highlighted children
   highlighted.forEach(function (ele) {
     if (ele.isNode() && ele.parent().length > 0) {
       ele.parent().removeClass('dimmed');
     }
   });
+}
+
+// --- Build folder tree elements ---
+// Walk a FolderTreeNode[] recursively and create cytoscape elements for all
+// folders and files. All start hidden; expand logic controls visibility.
+function buildFolderElements(elements, treeNodes, groupNodeId, groupId, parentFolderId, maxTime) {
+  for (var i = 0; i < treeNodes.length; i++) {
+    var tn = treeNodes[i];
+    if (tn.type === 'folder') {
+      elements.push({
+        group: 'nodes',
+        data: {
+          id: tn.id,
+          label: tn.label,
+          parent: groupNodeId,
+          isFolder: true,
+          groupId: groupId,
+        },
+        classes: 'folder',
+      });
+      folderState[tn.id] = { children: tn.children, groupId: groupId };
+      parentFolderOf[tn.id] = parentFolderId;
+      buildFolderElements(elements, tn.children, groupNodeId, groupId, tn.id, maxTime);
+    } else {
+      // File node — it may already exist from the module creation loop.
+      // We record its parentFolder mapping regardless.
+      parentFolderOf[tn.moduleURL || tn.id] = parentFolderId;
+    }
+  }
 }
 
 function initGraph(data) {
@@ -328,6 +404,10 @@ function initGraph(data) {
     var group = data.groups[gi];
     for (var gmi = 0; gmi < group.modules.length; gmi++) {
       groupMap.set(group.modules[gmi], group);
+    }
+    if (group.folderTree && group.folderTree.length > 0) {
+      groupFolderTrees[group.id] = group.folderTree;
+      groupsWithFolderTree.add(group.id);
     }
   }
 
@@ -368,6 +448,28 @@ function initGraph(data) {
       },
       classes: grp.isNodeModules ? 'group node-modules' : 'group',
     });
+
+    // Build folder tree elements for this group
+    if (grp.folderTree && grp.folderTree.length > 0) {
+      buildFolderElements(elements, grp.folderTree, groupNodeId, grp.id, null, maxTime);
+    }
+  }
+
+  // Build a set of module URLs that appear in folder trees as files
+  // (to set their label from the tree instead of the specifier)
+  var folderTreeFileLabels = {};
+  function collectFileLabels(treeNodes) {
+    for (var i = 0; i < treeNodes.length; i++) {
+      var tn = treeNodes[i];
+      if (tn.type === 'file' && tn.moduleURL) {
+        folderTreeFileLabels[tn.moduleURL] = tn.label;
+      } else if (tn.children) {
+        collectFileLabels(tn.children);
+      }
+    }
+  }
+  for (var gli = 0; gli < data.groups.length; gli++) {
+    if (data.groups[gli].folderTree) collectFileLabels(data.groups[gli].folderTree);
   }
 
   // Track unique modules (first occurrence)
@@ -382,11 +484,14 @@ function initGraph(data) {
     var timeRatio = maxTime > 0 ? totalTime / maxTime : 0;
     var isBuiltin = mod.resolvedURL.startsWith('node:');
 
+    // Use folder tree label if available
+    var label = folderTreeFileLabels[mod.resolvedURL] || mod.specifier;
+
     elements.push({
       group: 'nodes',
       data: {
         id: mod.resolvedURL,
-        label: mod.specifier,
+        label: label,
         parent: modGroup ? 'group-' + modGroup.id : undefined,
         totalTime: totalTime,
         timeRatio: timeRatio,
@@ -450,7 +555,6 @@ function initGraph(data) {
         },
       },
       {
-        // When expanded, label goes to top
         selector: 'node.group:parent',
         style: {
           'text-valign': 'top',
@@ -471,6 +575,22 @@ function initGraph(data) {
         style: {
           'background-color': '#282839',
           'border-style': 'dashed',
+        },
+      },
+      {
+        selector: 'node.folder',
+        style: {
+          'shape': 'round-rectangle',
+          'background-color': '#3b3b55',
+          'border-color': '#585b70',
+          'border-width': 1,
+          'label': 'data(label)',
+          'font-size': '10px',
+          'color': '#a6adc8',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'width': '80px',
+          'height': '30px',
         },
       },
       {
@@ -553,69 +673,39 @@ function initGraph(data) {
       },
       {
         selector: 'node.cycle-highlight',
-        style: {
-          'border-color': '#f38ba8',
-          'border-width': 3,
-        },
+        style: { 'border-color': '#f38ba8', 'border-width': 3 },
       },
-      // Selection highlighting — directional
       {
         selector: 'node.hl-selected',
-        style: {
-          'border-color': '#cdd6f4',
-          'border-width': 3,
-        },
+        style: { 'border-color': '#cdd6f4', 'border-width': 3 },
       },
       {
         selector: 'node.hl-outgoing',
-        style: {
-          'border-color': '#89b4fa',
-          'border-width': 3,
-        },
+        style: { 'border-color': '#89b4fa', 'border-width': 3 },
       },
       {
         selector: 'edge.hl-outgoing',
-        style: {
-          'line-color': '#89b4fa',
-          'target-arrow-color': '#89b4fa',
-          'width': 2,
-          'z-index': 5,
-        },
+        style: { 'line-color': '#89b4fa', 'target-arrow-color': '#89b4fa', 'width': 2, 'z-index': 5 },
       },
       {
         selector: 'node.hl-incoming',
-        style: {
-          'border-color': '#a6e3a1',
-          'border-width': 3,
-        },
+        style: { 'border-color': '#a6e3a1', 'border-width': 3 },
       },
       {
         selector: 'edge.hl-incoming',
-        style: {
-          'line-color': '#a6e3a1',
-          'target-arrow-color': '#a6e3a1',
-          'width': 2,
-          'z-index': 5,
-        },
+        style: { 'line-color': '#a6e3a1', 'target-arrow-color': '#a6e3a1', 'width': 2, 'z-index': 5 },
       },
       {
         selector: 'node.dimmed',
-        style: {
-          'opacity': 0.2,
-        },
+        style: { 'opacity': 0.2 },
       },
       {
         selector: 'edge.dimmed',
-        style: {
-          'opacity': 0.08,
-        },
+        style: { 'opacity': 0.08 },
       },
       {
         selector: ':selected',
-        style: {
-          'border-color': '#cdd6f4',
-          'border-width': 3,
-        },
+        style: { 'border-color': '#cdd6f4', 'border-width': 3 },
       },
     ],
     layout: { name: 'preset' },
@@ -627,39 +717,46 @@ function initGraph(data) {
   collapseAll(cy);
   runLayout(cy);
 
-  // Double-click group to toggle expand/collapse
-  cy.on('dbltap', 'node.group', function (e) {
-    var groupNode = e.target;
-    if (collapsedGroups.has(groupNode.id())) {
-      expandGroup(cy, groupNode);
-    } else {
-      collapseGroup(cy, groupNode);
+  // Double-click: expand/collapse groups, expand folders
+  cy.on('dbltap', 'node', function (e) {
+    var node = e.target;
+    if (node.hasClass('group')) {
+      if (collapsedGroups.has(node.id())) {
+        expandGroup(cy, node);
+      } else {
+        collapseGroup(cy, node);
+      }
+    } else if (node.hasClass('folder')) {
+      expandFolder(cy, node.id());
     }
   });
 
   // Tooltip handling
   cy.on('mouseover', 'node.module', function (e) {
-    var node = e.target;
-    var d = node.data();
+    var d = e.target.data();
     tooltip.innerHTML =
       '<div class="tooltip-path">' + escapeHtml(d.fullPath) + '</div>' +
       '<div class="tooltip-time">' + d.totalTime.toFixed(2) + ' ms</div>';
     tooltip.style.display = 'block';
   });
 
-  cy.on('mousemove', 'node.module', function (e) {
+  cy.on('mouseover', 'node.folder', function (e) {
+    tooltip.innerHTML = '<div class="tooltip-path">' + escapeHtml(e.target.data('label')) + '</div>';
+    tooltip.style.display = 'block';
+  });
+
+  cy.on('mousemove', 'node.module, node.folder', function (e) {
     var pos = e.renderedPosition || e.position;
     tooltip.style.left = (pos.x + 16) + 'px';
     tooltip.style.top = (pos.y + 16) + 'px';
   });
 
-  cy.on('mouseout', 'node.module', function () {
+  cy.on('mouseout', 'node.module, node.folder', function () {
     tooltip.style.display = 'none';
   });
 
   cy.on('mouseover', 'edge', function (e) {
-    var edge = e.target;
-    tooltip.innerHTML = '<div class="tooltip-path">' + escapeHtml(edge.data('specifier')) + '</div>';
+    tooltip.innerHTML = '<div class="tooltip-path">' + escapeHtml(e.target.data('specifier')) + '</div>';
     tooltip.style.display = 'block';
   });
 
@@ -678,15 +775,11 @@ function initGraph(data) {
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
-
-    if (!additive) {
-      cy.nodes().unselect();
-    }
+    if (!additive) cy.nodes().unselect();
     node.select();
     applySelectionHighlight(cy);
   });
 
-  // Click background to clear
   cy.on('tap', function (e) {
     if (e.target === cy) {
       cy.nodes().unselect();
@@ -708,15 +801,9 @@ function highlightCycle(cy, cycle) {
   clearSelectionHighlight(cy);
   cy.elements().removeClass('cycle-highlight');
 
-  // Expand groups containing cycle members so they become visible
+  // Reveal all cycle members (expand groups + folders)
   for (var k = 0; k < cycle.modules.length; k++) {
-    var cn = cy.getElementById(cycle.modules[k]);
-    if (cn.length > 0 && cn.parent().length > 0) {
-      var parentNode = cn.parent();
-      if (collapsedGroups.has(parentNode.id())) {
-        expandGroup(cy, parentNode);
-      }
-    }
+    revealModule(cy, cycle.modules[k]);
   }
 
   var nodes = [];
@@ -741,10 +828,7 @@ function highlightCycle(cy, cycle) {
     for (var j = 0; j < nodes.length; j++) {
       collection = collection.union(nodes[j]);
     }
-    cy.animate({
-      fit: { eles: collection, padding: 60 },
-      duration: 300,
-    });
+    cy.animate({ fit: { eles: collection, padding: 60 }, duration: 300 });
   }
 }
 
@@ -756,25 +840,21 @@ function clearHighlights(cy) {
 function zoomToNode(cy, resolvedURL) {
   var node = cy.getElementById(resolvedURL);
   if (node.length > 0) {
-    // Expand parent group if collapsed
-    if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) {
-      expandGroup(cy, node.parent());
-    }
+    revealModule(cy, resolvedURL);
     cy.nodes().unselect();
     node.select();
     applySelectionHighlight(cy);
-    cy.animate({
-      center: { eles: node },
-      zoom: 2,
-      duration: 300,
-    });
+    cy.animate({ center: { eles: node }, zoom: 2, duration: 300 });
   }
 }
 
 function filterBySearch(cy, query) {
   if (!query) {
-    cy.nodes('.module').forEach(function (node) {
+    cy.nodes('.module, .folder').forEach(function (node) {
       if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
+      // Don't show nodes inside unexpanded folders
+      var fid = parentFolderOf[node.id()];
+      if (fid && !expandedFolders.has(fid)) return;
       node.show();
     });
     return;
@@ -782,6 +862,8 @@ function filterBySearch(cy, query) {
   var lowerQuery = query.toLowerCase();
   cy.nodes('.module').forEach(function (node) {
     if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
+    var fid = parentFolderOf[node.id()];
+    if (fid && !expandedFolders.has(fid)) return;
     var label = (node.data('label') || '').toLowerCase();
     var path = (node.data('fullPath') || '').toLowerCase();
     if (label.indexOf(lowerQuery) !== -1 || path.indexOf(lowerQuery) !== -1) {
@@ -795,6 +877,8 @@ function filterBySearch(cy, query) {
 function filterByThreshold(cy, minTime) {
   cy.nodes('.module').forEach(function (node) {
     if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
+    var fid = parentFolderOf[node.id()];
+    if (fid && !expandedFolders.has(fid)) return;
     if (node.data('totalTime') < minTime) {
       node.hide();
     } else {
