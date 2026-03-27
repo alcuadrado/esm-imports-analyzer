@@ -600,13 +600,6 @@ function initGraph(data) {
       if (edgeSet.has(edgeId)) continue;
       edgeSet.add(edgeId);
 
-      var isCycleEdge = data.cycles.some(function (cycle) {
-        var idx = cycle.modules.indexOf(eMod.parentURL);
-        if (idx === -1) return false;
-        var nextIdx = (idx + 1) % cycle.modules.length;
-        return cycle.modules[nextIdx] === eMod.resolvedURL;
-      });
-
       elements.push({
         group: 'edges',
         data: {
@@ -614,9 +607,7 @@ function initGraph(data) {
           source: eMod.parentURL,
           target: eMod.resolvedURL,
           specifier: eMod.specifier,
-          isCycleEdge: isCycleEdge,
         },
-        classes: isCycleEdge ? 'cycle-edge' : '',
       });
     }
   }
@@ -741,19 +732,10 @@ function initGraph(data) {
         },
       },
       {
-        selector: 'edge.cycle-edge',
+        selector: 'edge.cycle-highlight',
         style: {
           'line-color': '#fab387',
           'target-arrow-color': '#fab387',
-          'width': 2,
-          'curve-style': 'bezier',
-        },
-      },
-      {
-        selector: 'edge.cycle-highlight',
-        style: {
-          'line-color': '#f38ba8',
-          'target-arrow-color': '#f38ba8',
           'width': 3,
           'z-index': 10,
           'curve-style': 'bezier',
@@ -761,7 +743,7 @@ function initGraph(data) {
       },
       {
         selector: 'node.cycle-highlight',
-        style: { 'border-color': '#f38ba8', 'border-width': 3 },
+        style: { 'border-color': '#fab387', 'border-width': 3 },
       },
       {
         selector: 'node.hl-selected',
@@ -954,41 +936,53 @@ function initGraph(data) {
 function highlightCycle(cy, cycle) {
   clearSelectionHighlight(cy);
   cy.elements().removeClass('cycle-highlight');
+  cy.nodes().unselect();
 
-  // Reveal all cycle members (expand groups + folders)
+  // Collapse all, then reveal just enough for cycle members
+  collapseAll(cy);
   for (var k = 0; k < cycle.modules.length; k++) {
     revealModule(cy, cycle.modules[k]);
   }
+  refreshEdgeVisibility(cy);
 
-  var nodes = [];
-  for (var i = 0; i < cycle.modules.length; i++) {
-    var node = cy.getElementById(cycle.modules[i]);
-    if (node.length > 0) {
-      node.addClass('cycle-highlight');
-      nodes.push(node);
+  runLayout(cy, function () {
+    // Apply cycle highlight after layout completes
+    var nodes = [];
+    for (var i = 0; i < cycle.modules.length; i++) {
+      var node = cy.getElementById(cycle.modules[i]);
+      if (node.length > 0) {
+        node.addClass('cycle-highlight');
+        nodes.push(node);
+      }
+
+      var nextIdx = (i + 1) % cycle.modules.length;
+      var edgeId = cycle.modules[i] + '->' + cycle.modules[nextIdx];
+      var edge = cy.getElementById(edgeId);
+      if (edge.length > 0) {
+        edge.show();
+        edge.addClass('cycle-highlight');
+      }
     }
 
-    var nextIdx = (i + 1) % cycle.modules.length;
-    var edgeId = cycle.modules[i] + '->' + cycle.modules[nextIdx];
-    var edge = cy.getElementById(edgeId);
-    if (edge.length > 0) {
-      edge.show();
-      edge.addClass('cycle-highlight');
+    if (nodes.length > 0) {
+      var collection = cy.collection();
+      for (var j = 0; j < nodes.length; j++) {
+        collection = collection.union(nodes[j]);
+      }
+      cy.animate({ fit: { eles: collection, padding: 60 }, duration: 300 });
     }
-  }
-
-  if (nodes.length > 0) {
-    var collection = cy.collection();
-    for (var j = 0; j < nodes.length; j++) {
-      collection = collection.union(nodes[j]);
-    }
-    cy.animate({ fit: { eles: collection, padding: 60 }, duration: 300 });
-  }
+  });
 }
 
 function clearHighlights(cy) {
+  cy.nodes().unselect();
   clearSelectionHighlight(cy);
   cy.elements().removeClass('cycle-highlight');
+  collapseAll(cy);
+  refreshEdgeVisibility(cy);
+  runLayout(cy, function () {
+    cy.animate({ fit: { eles: cy.elements(), padding: 30 }, duration: 300 });
+  });
 }
 
 function zoomToNode(cy, resolvedURL) {
