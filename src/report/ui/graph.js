@@ -758,6 +758,10 @@ function initGraph(data) {
         style: { 'border-color': '#cba6f7', 'border-width': 3 },
       },
       {
+        selector: 'node.group.hl-selected-parent:parent',
+        style: { 'border-color': '#cba6f7', 'border-width': 3 },
+      },
+      {
         selector: 'node.hl-outgoing',
         style: { 'border-color': '#89b4fa', 'border-width': 3 },
       },
