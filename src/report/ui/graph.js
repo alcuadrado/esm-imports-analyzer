@@ -651,6 +651,8 @@ function initGraph(data) {
           'text-halign': 'center',
           'border-width': 2,
           'border-color': '#585b70',
+          'width': 'label',
+          'padding': '20px',
         },
       },
       {
