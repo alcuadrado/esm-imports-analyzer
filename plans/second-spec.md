@@ -234,11 +234,19 @@ interface ReportData {
 ### Table (`src/report/ui/table.js`)
 
 Shows the import tree as a nested, expandable table:
-- Root level: entry point's direct imports, sorted by total time
+- Root level: entry point's direct imports **plus the 20 slowest modules promoted to root level**
+  - Computes 20 slowest unique modules (all types: file://, node:, data:)
+  - Modules already natural roots count toward the 20; remaining are promoted
+  - Promoted files appear identically to natural roots (same look, same expandable subtree)
+  - Promoted files are also still visible as children when expanding their natural parent (intentional duplication)
+  - If there are more than 20 natural roots, all are displayed
+- All root rows sorted together by current sort column (default: time desc)
 - Each row: module specifier, total time (with color bar), child import count
 - Chevron to expand children (lazy-rendered on first click)
 - Sortable columns: name, time, imports
-- Click a row → `zoomToNode()` in graph (reveals module, selects, zooms)
+- Click a row → `focusOnNode()` in graph:
+  - If target module is already visible → select + zoom (no relayout)
+  - If not visible → collapse all → reveal just enough (expand group + ancestor folders) → relayout → select + zoom
 - Search filters top-level rows only (depth 0)
 
 ### Cycles Panel (`src/report/ui/cycles-panel.js`)
@@ -323,9 +331,7 @@ Run all: `node --test test/unit/*.test.ts test/integration/*.test.ts test/perfor
 
 ## Pending / Not Yet Implemented
 
-1. **Slowest modules table section**: Planned addition of a "20 slowest files" section above the import tree table. Clicking a row would collapse everything, reveal just the target, relayout, and zoom. Two attempts were reverted — needs rethinking around table layout and UX details.
-
-2. **focusOnNode()**: Function was implemented and reverted. It collapses everything, reveals just the target module's path, relayouts, then selects+zooms. Should be re-added when the slowest modules table is implemented.
+(None at present.)
 
 ---
 

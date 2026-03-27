@@ -2,13 +2,49 @@
 
 function initTable(data, cy) {
   var tableBody = document.getElementById('table-body');
-  var tree = data.tree;
   var maxTime = 0;
 
   // Compute max time for bar widths
   for (var i = 0; i < data.modules.length; i++) {
     var t = data.modules[i].loadEndTime - data.modules[i].resolveStartTime;
     if (t > maxTime) maxTime = t;
+  }
+
+  // Build URL -> ModuleNode index from the full tree
+  var nodeByURL = {};
+  function indexTree(nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      nodeByURL[nodes[i].resolvedURL] = nodes[i];
+      indexTree(nodes[i].children);
+    }
+  }
+  indexTree(data.tree);
+
+  // Compute 20 slowest unique modules
+  var seen = {};
+  var slowest = [];
+  var modulesCopy = data.modules.slice().sort(function (a, b) {
+    return (b.loadEndTime - b.resolveStartTime) - (a.loadEndTime - a.resolveStartTime);
+  });
+  for (var i = 0; i < modulesCopy.length && slowest.length < 20; i++) {
+    var url = modulesCopy[i].resolvedURL;
+    if (!seen[url]) {
+      seen[url] = true;
+      slowest.push(url);
+    }
+  }
+
+  // Build root list: start with natural roots, then promote slow files not already roots
+  var rootURLs = {};
+  var tree = data.tree.slice();
+  for (var i = 0; i < tree.length; i++) {
+    rootURLs[tree[i].resolvedURL] = true;
+  }
+  for (var i = 0; i < slowest.length; i++) {
+    if (!rootURLs[slowest[i]] && nodeByURL[slowest[i]]) {
+      tree.push(nodeByURL[slowest[i]]);
+      rootURLs[slowest[i]] = true;
+    }
   }
 
   var currentSort = { column: 'time', direction: 'desc' };
@@ -59,7 +95,7 @@ function initTable(data, cy) {
     row.addEventListener('click', function (e) {
       if (e.target.classList.contains('chevron')) return;
       if (cy) {
-        zoomToNode(cy, node.resolvedURL);
+        focusOnNode(cy, node.resolvedURL);
       }
       // Highlight this row
       var rows = document.querySelectorAll('.table-row');

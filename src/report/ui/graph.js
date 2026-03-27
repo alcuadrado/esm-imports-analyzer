@@ -936,6 +936,32 @@ function zoomToNode(cy, resolvedURL) {
   }
 }
 
+function focusOnNode(cy, resolvedURL) {
+  var node = cy.getElementById(resolvedURL);
+  if (node.length === 0) return;
+
+  // If the module node is already visible, just select + zoom
+  if (node.visible()) {
+    cy.nodes().unselect();
+    node.select();
+    applySelectionHighlight(cy);
+    cy.animate({ center: { eles: node }, zoom: 2, duration: 300 });
+    return;
+  }
+
+  // Otherwise: collapse all, reveal just enough, relayout, then select + zoom
+  collapseAll(cy);
+  revealModule(cy, resolvedURL);
+  refreshEdgeVisibility(cy);
+  runLayout(cy, function () {
+    var n = cy.getElementById(resolvedURL);
+    cy.nodes().unselect();
+    n.select();
+    applySelectionHighlight(cy);
+    cy.animate({ center: { eles: n }, zoom: 2, duration: 300 });
+  });
+}
+
 // Search: highlight matching nodes in the graph. If a match is inside a
 // collapsed group or folder, highlight that collapsed ancestor instead.
 function filterBySearch(cy, query) {
