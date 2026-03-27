@@ -765,7 +765,7 @@ function initGraph(data) {
       },
       {
         selector: 'node.hl-selected',
-        style: { 'border-color': '#cdd6f4', 'border-width': 3 },
+        style: { 'border-color': '#cba6f7', 'border-width': 3 },
       },
       {
         selector: 'node.hl-outgoing',
