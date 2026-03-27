@@ -21,6 +21,7 @@
       <div class="filter-group">
         <button class="relayout-btn" id="collapse-all-btn">Collapse all</button>
         <button class="relayout-btn" id="relayout-btn">Re-layout</button>
+        <label><input type="checkbox" id="auto-relayout"> Auto re-layout</label>
       </div>
       <div class="filter-group">
         <input type="text" class="search-input" id="search-input" placeholder="Search modules...">
@@ -104,6 +105,20 @@
       // Re-layout button
       document.getElementById('relayout-btn').addEventListener('click', function () {
         runLayout(cy);
+      });
+
+      // Auto re-layout checkbox
+      var autoRelayoutCheckbox = document.getElementById('auto-relayout');
+      autoRelayoutCheckbox.addEventListener('change', function () {
+        autoRelayout = autoRelayoutCheckbox.checked;
+      });
+
+      // Benchmark: run layout on fully-expanded graph to decide default
+      benchmarkLayout(cy, function (elapsed) {
+        if (elapsed < 50) {
+          autoRelayout = true;
+          autoRelayoutCheckbox.checked = true;
+        }
       });
 
       // Resize handle

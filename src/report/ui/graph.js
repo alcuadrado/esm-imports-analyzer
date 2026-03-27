@@ -38,6 +38,7 @@ var DAGRE_WORKER_SRC = [
 
 var layoutOverlay = null;
 var collapsedGroups = new Set();
+var autoRelayout = false;
 
 // Folder tree state
 var groupFolderTrees = {};   // groupId -> FolderTreeNode[] (top-level children)
@@ -120,6 +121,50 @@ function runLayout(cy, callback) {
     worker.terminate();
     URL.revokeObjectURL(url);
     if (callback) callback();
+  };
+
+  worker.postMessage({ nodes: nodes, edges: edges, rankDir: 'TB', nodeSep: 40, edgeSep: 10, rankSep: 60 });
+}
+
+function maybeRelayout(cy) {
+  if (autoRelayout) runLayout(cy);
+}
+
+// Benchmark: run dagre on ALL nodes (fully expanded) and return elapsed ms via callback.
+// Does not apply positions — only measures computation time.
+function benchmarkLayout(cy, callback) {
+  var nodes = [];
+  var edges = [];
+
+  // Collect all module and folder nodes (simulate fully expanded state)
+  cy.nodes('.module, .folder').forEach(function (node) {
+    var parentId = node.parent().length > 0 ? node.parent().id() : null;
+    nodes.push({ id: node.id(), width: 60, height: 40, parent: parentId });
+  });
+  // Add group nodes as compound parents
+  cy.nodes('.group').forEach(function (node) {
+    nodes.push({ id: node.id(), width: 0, height: 0, parent: null });
+  });
+  cy.edges(':not(.meta-edge)').forEach(function (edge) {
+    edges.push({ id: edge.id(), source: edge.source().id(), target: edge.target().id() });
+  });
+
+  var blob = new Blob([DAGRE_WORKER_SRC], { type: 'application/javascript' });
+  var url = URL.createObjectURL(blob);
+  var worker = new Worker(url);
+  var startTime = performance.now();
+
+  worker.onmessage = function () {
+    var elapsed = performance.now() - startTime;
+    worker.terminate();
+    URL.revokeObjectURL(url);
+    callback(elapsed);
+  };
+
+  worker.onerror = function () {
+    worker.terminate();
+    URL.revokeObjectURL(url);
+    callback(Infinity);
   };
 
   worker.postMessage({ nodes: nodes, edges: edges, rankDir: 'TB', nodeSep: 40, edgeSep: 10, rankSep: 60 });
@@ -216,6 +261,7 @@ function expandGroup(cy, groupNode) {
   });
 
   refreshEdgeVisibility(cy);
+  maybeRelayout(cy);
 }
 
 // Collapse a group: hide ALL children, reset folder expansion state
@@ -240,6 +286,7 @@ function collapseGroup(cy, groupNode) {
   }
 
   refreshEdgeVisibility(cy);
+  maybeRelayout(cy);
 }
 
 // Expand a folder: hide the folder node, show its children
@@ -257,7 +304,7 @@ function expandFolder(cy, folderNodeId) {
   });
 
   refreshEdgeVisibility(cy);
-  runLayout(cy);
+  maybeRelayout(cy);
 }
 
 // Ensure a module node is visible by expanding its group and ancestor folders
