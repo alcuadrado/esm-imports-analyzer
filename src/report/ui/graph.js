@@ -9,9 +9,9 @@ var DAGRE_WORKER_SRC = [
   '  var g = new dagre.graphlib.Graph({ compound: true, multigraph: true });',
   '  g.setGraph({',
   '    rankdir: msg.rankDir || "TB",',
-  '    nodesep: msg.nodeSep || 40,',
-  '    edgesep: msg.edgeSep || 10,',
-  '    ranksep: msg.rankSep || 60,',
+  '    nodesep: msg.nodeSep || 60,',
+  '    edgesep: msg.edgeSep || 20,',
+  '    ranksep: msg.rankSep || 80,',
   '  });',
   '  g.setDefaultEdgeLabel(function () { return {}; });',
   '',
@@ -133,7 +133,7 @@ function runLayout(cy, callback) {
     if (callback) callback();
   };
 
-  worker.postMessage({ nodes: nodes, edges: edges, rankDir: 'TB', nodeSep: 40, edgeSep: 10, rankSep: 60 });
+  worker.postMessage({ nodes: nodes, edges: edges, rankDir: 'TB', nodeSep: 60, edgeSep: 20, rankSep: 80 });
 }
 
 function maybeRelayout(cy) {
@@ -638,7 +638,7 @@ function initGraph(data) {
           'text-halign': 'center',
           'font-size': '11px',
           'color': '#a6adc8',
-          'padding': '16px',
+          'padding': '24px',
           'shape': 'round-rectangle',
           'min-width': '80px',
           'min-height': '30px',
