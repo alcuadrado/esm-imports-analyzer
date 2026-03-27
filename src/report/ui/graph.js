@@ -622,7 +622,7 @@ function initGraph(data) {
       {
         selector: 'node.group',
         style: {
-          'background-opacity': 0.9,
+          'background-opacity': 0.75,
           'background-color': '#313147',
           'border-color': '#45475a',
           'border-width': 1,
