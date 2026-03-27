@@ -131,6 +131,21 @@ describe('groupModules', () => {
     assert.ok(typeof group.label === 'string' && group.label.length > 0, `Label should be non-empty, got: ${group.label}`);
   });
 
+  it('skips nested package.json inside node_modules', () => {
+    const fixtureDir = resolve('test/integration/fixtures/nested-pkg-json');
+    const deepURL = pathToFileURL(
+      resolve(fixtureDir, 'node_modules', 'fake-pkg', 'lib', 'esm', 'index.js')
+    ).href;
+
+    const records = [makeRecord(deepURL)];
+    const groups = groupModules(records);
+
+    const pkgGroup = groups.find(g => g.label === 'fake-pkg');
+    assert.ok(pkgGroup, 'Should group by actual package root, not nested package.json');
+    assert.equal(pkgGroup.isNodeModules, true);
+    assert.ok(pkgGroup.id.endsWith('/node_modules/fake-pkg'));
+  });
+
   it('falls back to Ungrouped when no package.json found', () => {
     // Use a URL in /tmp which has no package.json
     const tmpURL = pathToFileURL('/tmp/no-package-json-here/test.js').href;

@@ -13,9 +13,37 @@ interface PackageJsonInfo {
 
 const packageJsonCache = new Map<string, PackageJsonInfo | null>();
 
+function getNodeModulesPackageRoot(dir: string): string | null {
+  const SEP = '/node_modules/';
+  const lastNM = dir.lastIndexOf(SEP);
+  if (lastNM === -1) return null;
+
+  const afterNM = dir.substring(lastNM + SEP.length);
+  const parts = afterNM.split('/');
+  if (parts.length === 0 || parts[0] === '') return null;
+
+  // Scoped package: @scope/pkg
+  if (parts[0].startsWith('@')) {
+    if (parts.length < 2) return null;
+    return dir.substring(0, lastNM) + SEP + parts[0] + '/' + parts[1];
+  }
+
+  // Regular package: pkg
+  return dir.substring(0, lastNM) + SEP + parts[0];
+}
+
 function findPackageJson(dir: string): PackageJsonInfo | null {
   if (packageJsonCache.has(dir)) {
     return packageJsonCache.get(dir)!;
+  }
+
+  // For paths inside node_modules, jump directly to the package root
+  // instead of walking up and potentially hitting nested package.json files.
+  const nmRoot = getNodeModulesPackageRoot(dir);
+  if (nmRoot !== null && nmRoot !== dir) {
+    const result = findPackageJson(nmRoot);
+    packageJsonCache.set(dir, result);
+    return result;
   }
 
   const pkgPath = join(dir, 'package.json');
