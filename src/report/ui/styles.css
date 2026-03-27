@@ -91,6 +91,21 @@ body {
   accent-color: var(--accent);
 }
 
+.relayout-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.relayout-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
 .search-input {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);

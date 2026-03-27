@@ -19,6 +19,9 @@
     </div>
     <div class="header-controls">
       <div class="filter-group">
+        <button class="relayout-btn" id="relayout-btn">Re-layout</button>
+      </div>
+      <div class="filter-group">
         <label><input type="checkbox" id="show-builtins"> Show builtins</label>
       </div>
       <div class="filter-group">
@@ -64,13 +67,10 @@
   </script>
 
   <script src="https://unpkg.com/cytoscape@3.31.0/dist/cytoscape.min.js"></script>
-  <script src="https://unpkg.com/layout-base@1.0.2/layout-base.js"></script>
-  <script src="https://unpkg.com/cose-base@1.0.3/cose-base.js"></script>
-  <script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
-  <script src="https://unpkg.com/cytoscape-expand-collapse@4.1.1/cytoscape-expand-collapse.js"></script>
+  <script src="https://unpkg.com/dagre@0.7.4/dist/dagre.js"></script>
+  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
   <script>
-    // Register extensions with cytoscape
-    if (typeof cytoscapeCoseBilkent !== 'undefined') cytoscape.use(cytoscapeCoseBilkent);
+    if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
   </script>
 
   <script>
@@ -104,6 +104,11 @@
       var tableApi = initTable(data, cy);
       initCyclesPanel(data, cy);
       initFilters(cy, tableApi);
+
+      // Re-layout button
+      document.getElementById('relayout-btn').addEventListener('click', function () {
+        runLayout(cy);
+      });
 
       // Resize handle
       var resizeHandle = document.getElementById('resize-handle');

@@ -1,29 +1,46 @@
-/* global cytoscape, document, window */
+/* global cytoscape, document */
+
+var LAYOUT_OPTIONS = {
+  name: 'dagre',
+  rankDir: 'TB',
+  nodeSep: 40,
+  edgeSep: 10,
+  rankSep: 60,
+  animate: true,
+  animationDuration: 300,
+  fit: true,
+  padding: 30,
+};
+
+function runLayout(cy) {
+  cy.layout(LAYOUT_OPTIONS).run();
+}
 
 function initGraph(data) {
-  const container = document.getElementById('cy');
-  const tooltip = document.getElementById('graph-tooltip');
+  var container = document.getElementById('cy');
+  var tooltip = document.getElementById('graph-tooltip');
 
   // Build cytoscape elements
-  const elements = [];
-  const moduleSet = new Set();
-  const groupMap = new Map();
+  var elements = [];
+  var moduleSet = new Set();
+  var groupMap = new Map();
 
   // Create group map for quick lookup
-  for (const group of data.groups) {
-    for (const moduleURL of group.modules) {
-      groupMap.set(moduleURL, group);
+  for (var gi = 0; gi < data.groups.length; gi++) {
+    var group = data.groups[gi];
+    for (var gmi = 0; gmi < group.modules.length; gmi++) {
+      groupMap.set(group.modules[gmi], group);
     }
   }
 
   // Compute time range for color scaling
-  let maxTime = 0;
-  for (const mod of data.modules) {
-    const time = mod.loadEndTime - mod.resolveStartTime;
+  var maxTime = 0;
+  for (var ti = 0; ti < data.modules.length; ti++) {
+    var time = data.modules[ti].loadEndTime - data.modules[ti].resolveStartTime;
     if (time > maxTime) maxTime = time;
   }
 
-  // Compute per-group total time and edge counts
+  // Compute per-group total time
   var groupTotalTimes = {};
   var seenForGroupTime = {};
   for (var mi = 0; mi < data.modules.length; mi++) {
@@ -54,42 +71,44 @@ function initGraph(data) {
   }
 
   // Add group (compound) nodes
-  for (const group of data.groups) {
-    var groupNodeId = 'group-' + group.id;
+  for (var gni = 0; gni < data.groups.length; gni++) {
+    var grp = data.groups[gni];
+    var groupNodeId = 'group-' + grp.id;
     var groupTime = (groupTotalTimes[groupNodeId] || 0).toFixed(1);
     var edgeCount = groupEdgeCounts[groupNodeId] || 0;
     elements.push({
       group: 'nodes',
       data: {
         id: groupNodeId,
-        label: group.label + ' (' + group.modules.length + ' modules, ' + groupTime + ' ms, ' + edgeCount + ' edges)',
+        label: grp.label + ' (' + grp.modules.length + ' modules, ' + groupTime + ' ms)',
         isGroup: true,
-        groupId: group.id,
-        moduleCount: group.modules.length,
+        groupId: grp.id,
+        moduleCount: grp.modules.length,
         groupTotalTime: groupTotalTimes[groupNodeId] || 0,
         groupEdgeCount: edgeCount,
       },
-      classes: group.isNodeModules ? 'group node-modules' : 'group',
+      classes: grp.isNodeModules ? 'group node-modules' : 'group',
     });
   }
 
   // Track unique modules (first occurrence)
-  const seenModules = new Set();
-  for (const mod of data.modules) {
+  var seenModules = new Set();
+  for (var mni = 0; mni < data.modules.length; mni++) {
+    var mod = data.modules[mni];
     if (seenModules.has(mod.resolvedURL)) continue;
     seenModules.add(mod.resolvedURL);
 
-    const group = groupMap.get(mod.resolvedURL);
-    const totalTime = mod.loadEndTime - mod.resolveStartTime;
-    const timeRatio = maxTime > 0 ? totalTime / maxTime : 0;
-    const isBuiltin = mod.resolvedURL.startsWith('node:');
+    var modGroup = groupMap.get(mod.resolvedURL);
+    var totalTime = mod.loadEndTime - mod.resolveStartTime;
+    var timeRatio = maxTime > 0 ? totalTime / maxTime : 0;
+    var isBuiltin = mod.resolvedURL.startsWith('node:');
 
     elements.push({
       group: 'nodes',
       data: {
         id: mod.resolvedURL,
         label: mod.specifier,
-        parent: group ? 'group-' + group.id : undefined,
+        parent: modGroup ? 'group-' + modGroup.id : undefined,
         totalTime: totalTime,
         timeRatio: timeRatio,
         fullPath: mod.resolvedURL,
@@ -100,23 +119,29 @@ function initGraph(data) {
     moduleSet.add(mod.resolvedURL);
   }
 
-  // Add edges
-  for (const mod of data.modules) {
-    if (mod.parentURL && moduleSet.has(mod.parentURL) && moduleSet.has(mod.resolvedURL)) {
-      const isCycleEdge = data.cycles.some(function (cycle) {
-        const idx = cycle.modules.indexOf(mod.parentURL);
+  // Add edges (deduplicate)
+  var edgeSet = new Set();
+  for (var eni = 0; eni < data.modules.length; eni++) {
+    var eMod = data.modules[eni];
+    if (eMod.parentURL && moduleSet.has(eMod.parentURL) && moduleSet.has(eMod.resolvedURL)) {
+      var edgeId = eMod.parentURL + '->' + eMod.resolvedURL;
+      if (edgeSet.has(edgeId)) continue;
+      edgeSet.add(edgeId);
+
+      var isCycleEdge = data.cycles.some(function (cycle) {
+        var idx = cycle.modules.indexOf(eMod.parentURL);
         if (idx === -1) return false;
-        const nextIdx = (idx + 1) % cycle.modules.length;
-        return cycle.modules[nextIdx] === mod.resolvedURL;
+        var nextIdx = (idx + 1) % cycle.modules.length;
+        return cycle.modules[nextIdx] === eMod.resolvedURL;
       });
 
       elements.push({
         group: 'edges',
         data: {
-          id: mod.parentURL + '->' + mod.resolvedURL,
-          source: mod.parentURL,
-          target: mod.resolvedURL,
-          specifier: mod.specifier,
+          id: edgeId,
+          source: eMod.parentURL,
+          target: eMod.resolvedURL,
+          specifier: eMod.specifier,
           isCycleEdge: isCycleEdge,
         },
         classes: isCycleEdge ? 'cycle-edge' : '',
@@ -124,7 +149,7 @@ function initGraph(data) {
     }
   }
 
-  const cy = cytoscape({
+  var cy = cytoscape({
     container: container,
     elements: elements,
     style: [
@@ -160,9 +185,16 @@ function initGraph(data) {
           'text-valign': 'bottom',
           'text-halign': 'center',
           'text-margin-y': '4px',
-          'width': 'mapData(totalTime, 0, ' + maxTime + ', 16, 48)',
-          'height': 'mapData(totalTime, 0, ' + maxTime + ', 16, 48)',
-          'background-color': 'mapData(timeRatio, 0, 1, #a6e3a1, #f38ba8)',
+          'width': function (ele) { return Math.max(16, Math.min(48, 16 + (ele.data('totalTime') / (maxTime || 1)) * 32)); },
+          'height': function (ele) { return Math.max(16, Math.min(48, 16 + (ele.data('totalTime') / (maxTime || 1)) * 32)); },
+          'background-color': function (ele) {
+            var ratio = ele.data('timeRatio') || 0;
+            // green -> yellow -> red
+            var r = Math.round(ratio < 0.5 ? 166 + ratio * 2 * 87 : 243);
+            var g = Math.round(ratio < 0.5 ? 227 : 227 - (ratio - 0.5) * 2 * 87);
+            var b = Math.round(ratio < 0.5 ? 161 - ratio * 2 * 50 : 111 - (ratio - 0.5) * 2 * 50);
+            return 'rgb(' + r + ',' + g + ',' + b + ')';
+          },
           'border-width': 1,
           'border-color': '#45475a',
         },
@@ -179,10 +211,12 @@ function initGraph(data) {
         selector: 'edge',
         style: {
           'width': 1,
-          'line-color': '#45475a',
-          'target-arrow-color': '#45475a',
+          'line-color': '#585b70',
+          'target-arrow-color': '#585b70',
           'target-arrow-shape': 'triangle',
-          'curve-style': 'bezier',
+          'curve-style': 'taxi',
+          'taxi-direction': 'downward',
+          'taxi-turn': '20px',
           'arrow-scale': 0.7,
         },
       },
@@ -192,6 +226,7 @@ function initGraph(data) {
           'line-color': '#fab387',
           'target-arrow-color': '#fab387',
           'width': 2,
+          'curve-style': 'bezier',
         },
       },
       {
@@ -201,6 +236,7 @@ function initGraph(data) {
           'target-arrow-color': '#f38ba8',
           'width': 3,
           'z-index': 10,
+          'curve-style': 'bezier',
         },
       },
       {
@@ -237,60 +273,15 @@ function initGraph(data) {
         },
       },
     ],
-    layout: {
-      name: 'cose-bilkent',
-      animate: false,
-      nodeDimensionsIncludeLabels: true,
-      idealEdgeLength: 80,
-      nodeRepulsion: 8000,
-      edgeElasticity: 0.1,
-      nestingFactor: 0.3,
-      gravity: 0.2,
-      tile: true,
-      tilingPaddingVertical: 16,
-      tilingPaddingHorizontal: 16,
-    },
-    minZoom: 0.1,
+    layout: LAYOUT_OPTIONS,
+    minZoom: 0.05,
     maxZoom: 5,
-  });
-
-  // Initialize expand-collapse extension
-  var expandCollapseApi = null;
-  if (typeof cytoscapeExpandCollapse === 'function') {
-    cytoscape.use(cytoscapeExpandCollapse);
-    expandCollapseApi = cy.expandCollapse({
-      layoutBy: {
-        name: 'cose-bilkent',
-        animate: false,
-        nodeDimensionsIncludeLabels: true,
-        idealEdgeLength: 80,
-        nodeRepulsion: 8000,
-      },
-      fisheye: false,
-      animate: false,
-      undoable: false,
-      cueEnabled: true,
-    });
-    // Collapse all groups by default
-    expandCollapseApi.collapseAll();
-  }
-
-  // Double-click to expand/collapse groups
-  cy.on('dbltap', 'node.group', function (e) {
-    var node = e.target;
-    if (expandCollapseApi) {
-      if (node.hasClass('cy-expand-collapse-collapsed-node')) {
-        expandCollapseApi.expand(node);
-      } else {
-        expandCollapseApi.collapse(node);
-      }
-    }
   });
 
   // Tooltip handling
   cy.on('mouseover', 'node.module', function (e) {
-    const node = e.target;
-    const d = node.data();
+    var node = e.target;
+    var d = node.data();
     tooltip.innerHTML =
       '<div class="tooltip-path">' + escapeHtml(d.fullPath) + '</div>' +
       '<div class="tooltip-time">' + d.totalTime.toFixed(2) + ' ms</div>';
@@ -298,7 +289,7 @@ function initGraph(data) {
   });
 
   cy.on('mousemove', 'node.module', function (e) {
-    const pos = e.renderedPosition || e.position;
+    var pos = e.renderedPosition || e.position;
     tooltip.style.left = (pos.x + 16) + 'px';
     tooltip.style.top = (pos.y + 16) + 'px';
   });
@@ -308,13 +299,13 @@ function initGraph(data) {
   });
 
   cy.on('mouseover', 'edge', function (e) {
-    const edge = e.target;
+    var edge = e.target;
     tooltip.innerHTML = '<div class="tooltip-path">' + escapeHtml(edge.data('specifier')) + '</div>';
     tooltip.style.display = 'block';
   });
 
   cy.on('mousemove', 'edge', function (e) {
-    const pos = e.renderedPosition || e.position;
+    var pos = e.renderedPosition || e.position;
     tooltip.style.left = (pos.x + 16) + 'px';
     tooltip.style.top = (pos.y + 16) + 'px';
   });
@@ -325,9 +316,9 @@ function initGraph(data) {
 
   // Click node to highlight connections
   cy.on('tap', 'node.module', function (e) {
-    const node = e.target;
-    cy.elements().removeClass('dimmed');
-    const connected = node.connectedEdges().connectedNodes().union(node).union(node.connectedEdges());
+    var node = e.target;
+    cy.elements().removeClass('dimmed highlight');
+    var connected = node.connectedEdges().connectedNodes().union(node).union(node.connectedEdges());
     cy.elements().not(connected).addClass('dimmed');
     node.addClass('highlight');
   });
@@ -352,20 +343,6 @@ function initGraph(data) {
 
 function highlightCycle(cy, cycle) {
   cy.elements().removeClass('dimmed highlight cycle-highlight');
-
-  // Expand any groups containing cycle members
-  var api = cy.expandCollapse ? cy.expandCollapse('get') : null;
-  if (api) {
-    for (var k = 0; k < cycle.modules.length; k++) {
-      var n = cy.getElementById(cycle.modules[k]);
-      if (n.length > 0 && n.parent().length > 0) {
-        var parentNode = n.parent();
-        if (parentNode.hasClass('cy-expand-collapse-collapsed-node')) {
-          api.expand(parentNode);
-        }
-      }
-    }
-  }
 
   var nodes = [];
   for (var i = 0; i < cycle.modules.length; i++) {

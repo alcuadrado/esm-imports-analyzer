@@ -46,14 +46,14 @@ describe('report generation', () => {
     assert.ok(Array.isArray(data.cycles));
   });
 
-  it('includes Cytoscape.js via CDN', () => {
+  it('includes Cytoscape.js and dagre via CDN', () => {
     const output = createTempOutputPath();
     tempPaths.push(output);
     runCli(['-o', output, '--', 'node', resolve(fixturesDir, 'simple/a.js')]);
 
     const html = readFileSync(output, 'utf-8');
     assert.ok(html.includes('unpkg.com/cytoscape'), 'Should include cytoscape CDN script');
-    assert.ok(html.includes('unpkg.com/cytoscape-cose-bilkent'), 'Should include cose-bilkent CDN script');
+    assert.ok(html.includes('unpkg.com/cytoscape-dagre'), 'Should include dagre CDN script');
   });
 
   it('inlines CSS', () => {
