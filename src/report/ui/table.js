@@ -49,6 +49,11 @@ function initTable(data, cy) {
     return '#f38ba8';
   }
 
+  function getDisplayPath(url) {
+    if (url.startsWith('file://')) return url.slice(7);
+    return url;
+  }
+
   function countAllChildren(node) {
     var count = node.children.length;
     for (var i = 0; i < node.children.length; i++) {
@@ -73,7 +78,7 @@ function initTable(data, cy) {
     row.innerHTML =
       '<div class="module-name" style="padding-left: ' + indent + 'px">' +
         '<span class="chevron' + (hasChildren ? '' : ' empty') + '">' + (hasChildren ? '\u25B6' : '') + '</span>' +
-        '<span class="module-label" title="' + escapeAttr(node.resolvedURL) + '">' + escapeHtml(node.specifier) + '</span>' +
+        '<span class="module-label" title="' + escapeAttr(node.resolvedURL) + '">' + escapeHtml(depth === 0 ? getDisplayPath(node.resolvedURL) : node.specifier) + '</span>' +
       '</div>' +
       '<div class="time-value">' +
         '<span class="time-bar" style="width: ' + barWidth + 'px; background: ' + timeColor + '"></span>' +
