@@ -200,6 +200,12 @@ function refreshEdgeVisibility(cy) {
   });
 }
 
+function selectAndHighlight(cy, node) {
+  cy.nodes().unselect();
+  node.select();
+  applySelectionHighlight(cy);
+}
+
 // Expand a group: show top-level folder tree children (or all children if no tree)
 function expandGroup(cy, groupNode) {
   collapsedGroups.delete(groupNode.id());
@@ -222,6 +228,7 @@ function expandGroup(cy, groupNode) {
 
   refreshEdgeVisibility(cy);
   maybeRelayout(cy);
+  selectAndHighlight(cy, groupNode);
 }
 
 // Collapse a group: hide ALL children, reset folder expansion state
@@ -247,6 +254,7 @@ function collapseGroup(cy, groupNode) {
 
   refreshEdgeVisibility(cy);
   maybeRelayout(cy);
+  selectAndHighlight(cy, groupNode);
 }
 
 // Expand a folder: hide the folder node, show its children
@@ -256,15 +264,25 @@ function expandFolder(cy, folderNodeId) {
 
   expandedFolders.add(folderNodeId);
 
+  var childIds = [];
   cy.batch(function () {
     cy.getElementById(folderNodeId).hide();
     for (var i = 0; i < state.children.length; i++) {
-      cy.getElementById(state.children[i].id).show();
+      var childId = state.children[i].id;
+      cy.getElementById(childId).show();
+      childIds.push(childId);
     }
   });
 
   refreshEdgeVisibility(cy);
   maybeRelayout(cy);
+
+  // Select the newly revealed children
+  cy.nodes().unselect();
+  for (var j = 0; j < childIds.length; j++) {
+    cy.getElementById(childIds[j]).select();
+  }
+  applySelectionHighlight(cy);
 }
 
 // Ensure a module node is visible by expanding its group and ancestor folders
