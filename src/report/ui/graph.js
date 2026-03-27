@@ -989,7 +989,13 @@ function expandImporters(cy, node) {
   refreshEdgeVisibility(cy);
   suppressAutoSelect = false;
 
-  runLayout(cy);
+  var nodeId = node.id();
+  runLayout(cy, function () {
+    var n = cy.getElementById(nodeId);
+    cy.nodes().unselect();
+    n.select();
+    applySelectionHighlight(cy);
+  });
 }
 
 function highlightCycle(cy, cycle) {
