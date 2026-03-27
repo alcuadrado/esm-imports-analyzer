@@ -3,13 +3,6 @@
 function initTable(data, cy) {
   var tableBody = document.getElementById('table-body');
   var countInput = document.getElementById('slowest-count');
-  var maxTime = 0;
-
-  // Compute max time for bar widths
-  for (var i = 0; i < data.modules.length; i++) {
-    var t = (data.modules[i].resolveEndTime - data.modules[i].resolveStartTime) + (data.modules[i].loadEndTime - data.modules[i].loadStartTime);
-    if (t > maxTime) maxTime = t;
-  }
 
   // Build URL -> ModuleNode index from the full tree
   var nodeByURL = {};
@@ -21,33 +14,47 @@ function initTable(data, cy) {
   }
   indexTree(data.tree);
 
-  // Pre-sort all unique modules by time descending
-  var allSlowest = [];
-  var seen = {};
-  var modulesCopy = data.modules.slice().sort(function (a, b) {
-    return ((b.resolveEndTime - b.resolveStartTime) + (b.loadEndTime - b.loadStartTime)) - ((a.resolveEndTime - a.resolveStartTime) + (a.loadEndTime - a.loadStartTime));
-  });
-  for (var i = 0; i < modulesCopy.length; i++) {
-    var url = modulesCopy[i].resolvedURL;
-    if (!seen[url] && nodeByURL[url]) {
-      seen[url] = true;
-      allSlowest.push(nodeByURL[url]);
+  // Build timing lookup (first occurrence per URL)
+  var timingByURL = {};
+  for (var i = 0; i < data.modules.length; i++) {
+    var m = data.modules[i];
+    if (!timingByURL[m.resolvedURL]) {
+      timingByURL[m.resolvedURL] = {
+        totalTime: (m.resolveEndTime - m.resolveStartTime) + (m.loadEndTime - m.loadStartTime),
+        resolveTime: m.resolveEndTime - m.resolveStartTime,
+        loadTime: m.loadEndTime - m.loadStartTime,
+      };
     }
   }
 
-  function buildRoots(count) {
-    return allSlowest.slice(0, count);
+  // Collect all unique modules that have tree nodes
+  var allModules = [];
+  var seen = {};
+  for (var i = 0; i < data.modules.length; i++) {
+    var url = data.modules[i].resolvedURL;
+    if (!seen[url] && nodeByURL[url]) {
+      seen[url] = true;
+      allModules.push(nodeByURL[url]);
+    }
+  }
+
+  function getMetric(node, column) {
+    var t = timingByURL[node.resolvedURL];
+    if (column === 'time') return t ? t.totalTime : node.totalTime;
+    if (column === 'resolve') return t ? t.resolveTime : 0;
+    if (column === 'load') return t ? t.loadTime : 0;
+    if (column === 'imports') return countAllChildren(node);
+    return 0;
+  }
+
+  function buildRoots(count, sortColumn) {
+    var sorted = allModules.slice().sort(function (a, b) {
+      return getMetric(b, sortColumn) - getMetric(a, sortColumn);
+    });
+    return sorted.slice(0, count);
   }
 
   var currentSort = { column: 'time', direction: 'desc' };
-
-  function getTimeColor(time) {
-    if (maxTime === 0) return '#a6e3a1';
-    var ratio = time / maxTime;
-    if (ratio < 0.33) return '#a6e3a1';
-    if (ratio < 0.66) return '#f9e2af';
-    return '#f38ba8';
-  }
 
   function getDisplayPath(url) {
     if (url.startsWith('file://')) return url.slice(7);
@@ -71,19 +78,16 @@ function initTable(data, cy) {
     var hasChildren = node.children.length > 0;
     var indent = depth * 20;
     var childCount = countAllChildren(node);
-
-    var timeColor = getTimeColor(node.totalTime);
-    var barWidth = maxTime > 0 ? Math.max(2, (node.totalTime / maxTime) * 60) : 2;
+    var t = timingByURL[node.resolvedURL] || { totalTime: node.totalTime, resolveTime: 0, loadTime: 0 };
 
     row.innerHTML =
       '<div class="module-name" style="padding-left: ' + indent + 'px">' +
         '<span class="chevron' + (hasChildren ? '' : ' empty') + '">' + (hasChildren ? '\u25B6' : '') + '</span>' +
         '<span class="module-label" title="' + escapeAttr(node.resolvedURL) + '">' + escapeHtml(depth === 0 ? getDisplayPath(node.resolvedURL) : node.specifier) + '</span>' +
       '</div>' +
-      '<div class="time-value">' +
-        '<span class="time-bar" style="width: ' + barWidth + 'px; background: ' + timeColor + '"></span>' +
-        node.totalTime.toFixed(2) + ' ms' +
-      '</div>' +
+      '<div class="time-value">' + t.totalTime.toFixed(2) + ' ms</div>' +
+      '<div class="time-value">' + t.resolveTime.toFixed(2) + ' ms</div>' +
+      '<div class="time-value">' + t.loadTime.toFixed(2) + ' ms</div>' +
       '<div class="imports-count">' + childCount + '</div>';
 
     parentElement.appendChild(row);
@@ -130,12 +134,10 @@ function initTable(data, cy) {
     var sorted = nodes.slice();
     sorted.sort(function (a, b) {
       var cmp = 0;
-      if (sort.column === 'time') {
-        cmp = a.totalTime - b.totalTime;
-      } else if (sort.column === 'name') {
+      if (sort.column === 'name') {
         cmp = a.specifier.localeCompare(b.specifier);
-      } else if (sort.column === 'imports') {
-        cmp = countAllChildren(a) - countAllChildren(b);
+      } else {
+        cmp = getMetric(a, sort.column) - getMetric(b, sort.column);
       }
       return sort.direction === 'desc' ? -cmp : cmp;
     });
@@ -145,7 +147,7 @@ function initTable(data, cy) {
   function renderTable() {
     tableBody.innerHTML = '';
     var count = parseInt(countInput.value, 10) || 20;
-    var roots = sortNodes(buildRoots(count), currentSort);
+    var roots = sortNodes(buildRoots(count, currentSort.column), currentSort);
     for (var i = 0; i < roots.length; i++) {
       renderRow(roots[i], 0, tableBody);
     }

@@ -465,7 +465,7 @@ function applySelectionHighlight(cy) {
 // --- Build folder tree elements ---
 // Walk a FolderTreeNode[] recursively and create cytoscape elements for all
 // folders and files. All start hidden; expand logic controls visibility.
-function buildFolderElements(elements, treeNodes, groupNodeId, groupId, parentFolderId, maxTime) {
+function buildFolderElements(elements, treeNodes, groupNodeId, groupId, parentFolderId) {
   for (var i = 0; i < treeNodes.length; i++) {
     var tn = treeNodes[i];
     if (tn.type === 'folder') {
@@ -482,7 +482,7 @@ function buildFolderElements(elements, treeNodes, groupNodeId, groupId, parentFo
       });
       folderState[tn.id] = { children: tn.children, groupId: groupId };
       parentFolderOf[tn.id] = parentFolderId;
-      buildFolderElements(elements, tn.children, groupNodeId, groupId, tn.id, maxTime);
+      buildFolderElements(elements, tn.children, groupNodeId, groupId, tn.id);
     } else {
       // File node — it may already exist from the module creation loop.
       // We record its parentFolder mapping regardless.
@@ -510,11 +510,6 @@ function initGraph(data) {
     }
   }
 
-  var maxTime = 0;
-  for (var ti = 0; ti < data.modules.length; ti++) {
-    var time = (data.modules[ti].resolveEndTime - data.modules[ti].resolveStartTime) + (data.modules[ti].loadEndTime - data.modules[ti].loadStartTime);
-    if (time > maxTime) maxTime = time;
-  }
 
   // Compute per-group total time
   var groupTotalTimes = {};
@@ -550,7 +545,7 @@ function initGraph(data) {
 
     // Build folder tree elements for this group
     if (grp.folderTree && grp.folderTree.length > 0) {
-      buildFolderElements(elements, grp.folderTree, groupNodeId, grp.id, null, maxTime);
+      buildFolderElements(elements, grp.folderTree, groupNodeId, grp.id, null);
     }
   }
 
@@ -580,7 +575,6 @@ function initGraph(data) {
 
     var modGroup = groupMap.get(mod.resolvedURL);
     var totalTime = (mod.resolveEndTime - mod.resolveStartTime) + (mod.loadEndTime - mod.loadStartTime);
-    var timeRatio = maxTime > 0 ? totalTime / maxTime : 0;
     var isBuiltin = mod.resolvedURL.startsWith('node:');
 
     // Use folder tree label if available
@@ -593,7 +587,6 @@ function initGraph(data) {
         label: label,
         parent: modGroup ? 'group-' + modGroup.id : undefined,
         totalTime: totalTime,
-        timeRatio: timeRatio,
         fullPath: mod.resolvedURL,
         isBuiltin: isBuiltin,
       },
@@ -697,15 +690,9 @@ function initGraph(data) {
           'text-valign': 'bottom',
           'text-halign': 'center',
           'text-margin-y': '4px',
-          'width': function (ele) { return Math.max(16, Math.min(48, 16 + (ele.data('totalTime') / (maxTime || 1)) * 32)); },
-          'height': function (ele) { return Math.max(16, Math.min(48, 16 + (ele.data('totalTime') / (maxTime || 1)) * 32)); },
-          'background-color': function (ele) {
-            var ratio = ele.data('timeRatio') || 0;
-            var r = Math.round(ratio < 0.5 ? 166 + ratio * 2 * 87 : 243);
-            var g = Math.round(ratio < 0.5 ? 227 : 227 - (ratio - 0.5) * 2 * 87);
-            var b = Math.round(ratio < 0.5 ? 161 - ratio * 2 * 50 : 111 - (ratio - 0.5) * 2 * 50);
-            return 'rgb(' + r + ',' + g + ',' + b + ')';
-          },
+          'width': 24,
+          'height': 24,
+          'background-color': '#89b4fa',
           'border-width': 1,
           'border-color': '#45475a',
         },

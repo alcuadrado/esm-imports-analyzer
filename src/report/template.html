@@ -59,8 +59,10 @@
         </div>
         <div class="table-header-row">
           <span class="col-module" data-sort="name">Module <span class="sort-arrow"></span></span>
-          <span class="col-time" data-sort="time">Total Time <span class="sort-arrow">&#9660;</span></span>
-          <span class="col-imports" data-sort="imports">Imports <span class="sort-arrow"></span></span>
+          <span class="col-time" data-sort="time">Total Time <span class="header-info-icon" title="Time spent resolving + loading this module (self-time, excludes other modules loaded in between)">&#9432;</span> <span class="sort-arrow">&#9660;</span></span>
+          <span class="col-resolve" data-sort="resolve">Resolve <span class="header-info-icon" title="Time spent locating the module on disk (filesystem lookups, package.json exports resolution)">&#9432;</span> <span class="sort-arrow"></span></span>
+          <span class="col-load" data-sort="load">Load <span class="header-info-icon" title="Time spent reading and parsing the module source from disk">&#9432;</span> <span class="sort-arrow"></span></span>
+          <span class="col-imports" data-sort="imports">Imports <span class="header-info-icon" title="Total number of modules imported by this module (recursively)">&#9432;</span> <span class="sort-arrow"></span></span>
         </div>
         <div class="table-body" id="table-body"></div>
       </div>
