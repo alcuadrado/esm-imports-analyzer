@@ -486,6 +486,29 @@ body {
   vertical-align: middle;
 }
 
+/* Graph context menu */
+.graph-context-menu {
+  position: absolute;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 0;
+  z-index: 150;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.graph-context-menu-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.graph-context-menu-item:hover {
+  background: var(--border);
+}
+
 /* Sort indicator */
 .sort-arrow {
   font-size: 10px;

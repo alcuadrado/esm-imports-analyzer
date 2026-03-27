@@ -876,6 +876,56 @@ function initGraph(data) {
     }
   });
 
+  // Context menu (right-click)
+  var ctxMenu = document.createElement('div');
+  ctxMenu.className = 'graph-context-menu';
+  ctxMenu.style.display = 'none';
+  document.querySelector('.graph-container').appendChild(ctxMenu);
+
+  function hideContextMenu() {
+    ctxMenu.style.display = 'none';
+  }
+
+  function getNodePath(node) {
+    var d = node.data();
+    if (d.fullPath) {
+      // Module node — strip file:// prefix
+      if (d.fullPath.startsWith('file://')) return d.fullPath.slice(7);
+      return d.fullPath;
+    }
+    if (d.groupId && d.isGroup) return d.groupId;
+    if (d.isFolder) {
+      // Folder ID is ftree::<groupId>::<relativePath> — return groupId + / + relative
+      var parts = (d.id || '').split('::');
+      if (parts.length >= 3) return parts[1] + '/' + parts.slice(2).join('::');
+      return d.id;
+    }
+    return d.id || '';
+  }
+
+  cy.on('cxttap', 'node', function (e) {
+    e.originalEvent.preventDefault();
+    var node = e.target;
+    var path = getNodePath(node);
+    var pos = e.renderedPosition || e.position;
+
+    ctxMenu.innerHTML = '';
+    var item = document.createElement('div');
+    item.className = 'graph-context-menu-item';
+    item.textContent = 'Copy absolute path';
+    item.addEventListener('click', function () {
+      navigator.clipboard.writeText(path);
+      hideContextMenu();
+    });
+    ctxMenu.appendChild(item);
+    ctxMenu.style.left = pos.x + 'px';
+    ctxMenu.style.top = pos.y + 'px';
+    ctxMenu.style.display = 'block';
+  });
+
+  cy.on('tap', function () { hideContextMenu(); });
+  document.addEventListener('click', function () { hideContextMenu(); });
+
   function escapeHtml(str) {
     var div = document.createElement('div');
     div.textContent = str;
