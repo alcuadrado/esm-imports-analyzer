@@ -1,0 +1,23 @@
+{
+  "name": "esm-imports-analyzer",
+  "version": "1.0.0",
+  "description": "A tool to generate an HTML visualization of the imports of an ESM Node.js application. It executes the application, tracks the imports during runtime, and creates the visualization after the execution is complete.",
+  "keywords": [
+    "node",
+    "esm",
+    "imports",
+    "analyzer",
+    "optimization"
+  ],
+  "author": "Patricio Palladino <email@patriciopalladino.com>",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
