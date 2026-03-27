@@ -793,7 +793,7 @@ function initGraph(data) {
       },
       {
         selector: ':selected',
-        style: { 'border-color': '#cdd6f4', 'border-width': 3 },
+        style: { 'border-color': '#cba6f7', 'border-width': 3 },
       },
     ],
     layout: { name: 'preset' },
