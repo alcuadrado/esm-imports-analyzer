@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "rm -rf dist && tsc && cp -r src/report/ui dist/report/ui && cp src/report/template.html dist/report/template.html && mkdir -p dist/vendor && cp node_modules/cytoscape/dist/cytoscape.min.js dist/vendor/cytoscape.min.js && cp node_modules/cytoscape-cose-bilkent/cytoscape-cose-bilkent.js dist/vendor/cytoscape-cose-bilkent.js && cp node_modules/cytoscape-expand-collapse/cytoscape-expand-collapse.js dist/vendor/cytoscape-expand-collapse.js",
+    "build": "rm -rf dist && tsc && cp -r src/report/ui dist/report/ui && cp src/report/template.html dist/report/template.html",
     "test": "node --test test/**/*.test.ts",
     "test:unit": "node --test test/unit/**/*.test.ts",
     "test:integration": "node --test test/integration/**/*.test.ts",
@@ -30,9 +30,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "cytoscape": "^3.31.0",
-    "cytoscape-cose-bilkent": "^4.1.0",
-    "cytoscape-expand-collapse": "^4.1.1",
     "typescript": "^6.0.2"
   }
 }
