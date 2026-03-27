@@ -19,12 +19,13 @@
     </div>
     <div class="header-controls">
       <div class="filter-group">
-        <button class="relayout-btn" id="collapse-all-btn">Collapse all</button>
-        <label><input type="checkbox" id="auto-relayout" checked> Auto re-layout</label>
-        <button class="relayout-btn" id="relayout-btn">Re-layout</button>
+        <input type="text" class="search-input" id="search-input" placeholder="Search modules...">
       </div>
       <div class="filter-group">
-        <input type="text" class="search-input" id="search-input" placeholder="Search modules...">
+        <button class="relayout-btn" id="expand-all-btn">Expand all</button>
+        <button class="relayout-btn" id="collapse-all-btn">Collapse all</button>
+        <button class="relayout-btn" id="relayout-btn">Re-layout</button>
+        <label><input type="checkbox" id="auto-relayout" checked> Auto re-layout</label>
       </div>
     </div>
   </div>
@@ -96,7 +97,11 @@
       initCyclesPanel(data, cy);
       initFilters(cy, tableApi);
 
-      // Collapse all button
+      // Expand/Collapse all buttons
+      document.getElementById('expand-all-btn').addEventListener('click', function () {
+        expandAll(cy);
+        runLayout(cy);
+      });
       document.getElementById('collapse-all-btn').addEventListener('click', function () {
         collapseAll(cy);
         runLayout(cy);

@@ -304,6 +304,40 @@ function collapseAll(cy) {
   refreshEdgeVisibility(cy);
 }
 
+function expandAll(cy) {
+  cy.batch(function () {
+    // Expand all groups
+    cy.nodes('.group').forEach(function (groupNode) {
+      collapsedGroups.delete(groupNode.id());
+      groupNode.removeClass('collapsed');
+    });
+
+    // Expand all folders: hide folder nodes, show their children
+    var changed = true;
+    while (changed) {
+      changed = false;
+      cy.nodes('.folder:visible').forEach(function (fNode) {
+        var state = folderState[fNode.id()];
+        if (state && !expandedFolders.has(fNode.id())) {
+          expandedFolders.add(fNode.id());
+          fNode.hide();
+          for (var i = 0; i < state.children.length; i++) {
+            cy.getElementById(state.children[i].id).show();
+          }
+          changed = true;
+        }
+      });
+    }
+
+    // Show any remaining module nodes that might still be hidden
+    cy.nodes('.module').forEach(function (node) {
+      node.show();
+    });
+  });
+
+  refreshEdgeVisibility(cy);
+}
+
 // --- Directional selection highlighting ---
 var HL_CLASSES = ['hl-selected', 'hl-selected-parent', 'hl-outgoing', 'hl-incoming', 'dimmed'];
 
