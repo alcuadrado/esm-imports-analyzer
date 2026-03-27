@@ -511,34 +511,18 @@ function initGraph(data) {
   }
 
 
-  // Compute per-group total time
-  var groupTotalTimes = {};
-  var seenForGroupTime = {};
-  for (var mi = 0; mi < data.modules.length; mi++) {
-    var m = data.modules[mi];
-    if (seenForGroupTime[m.resolvedURL]) continue;
-    seenForGroupTime[m.resolvedURL] = true;
-    var g = groupMap.get(m.resolvedURL);
-    if (g) {
-      var gid = 'group-' + g.id;
-      groupTotalTimes[gid] = (groupTotalTimes[gid] || 0) + (m.resolveEndTime - m.resolveStartTime) + (m.loadEndTime - m.loadStartTime);
-    }
-  }
-
   // Add group (compound) nodes
   for (var gni = 0; gni < data.groups.length; gni++) {
     var grp = data.groups[gni];
     var groupNodeId = 'group-' + grp.id;
-    var groupTime = (groupTotalTimes[groupNodeId] || 0).toFixed(1);
     elements.push({
       group: 'nodes',
       data: {
         id: groupNodeId,
-        label: grp.label + ' (' + grp.modules.length + ' modules, ' + groupTime + ' ms)',
+        label: grp.label + ' (' + grp.modules.length + ' modules)',
         isGroup: true,
         groupId: grp.id,
         moduleCount: grp.modules.length,
-        groupTotalTime: groupTotalTimes[groupNodeId] || 0,
       },
       classes: grp.isNodeModules ? 'group node-modules' : 'group',
     });

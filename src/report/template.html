@@ -13,9 +13,7 @@
     <h1>ESM Imports Analyzer</h1>
     <div class="header-meta">
       <span id="meta-command"></span> &middot;
-      <span id="meta-modules"></span> modules &middot;
-      <span id="meta-time"></span>
-      <span class="timing-note" title="Timing measurements have approximately 3-5 microseconds of systematic undercount per import due to internal Node.js module resolution overhead. The instrumentation itself adds less than 0.2 microseconds per import. For modules that take more than 0.1ms to load, these overheads are negligible (&lt;1%).">&#9432;</span>
+      <span id="meta-modules"></span> modules
     </div>
     <div class="header-controls">
       <div class="filter-group">
@@ -95,7 +93,6 @@
       // Set metadata
       document.getElementById('meta-command').textContent = data.metadata.command;
       document.getElementById('meta-modules').textContent = data.metadata.totalModules;
-      document.getElementById('meta-time').textContent = data.metadata.totalTime.toFixed(1) + ' ms';
 
       // Init components
       var cy = initGraph(data);
