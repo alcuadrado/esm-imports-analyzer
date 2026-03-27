@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ImportRecord, Group } from '../types.ts';
+import { buildFolderTree } from './folder-tree.ts';
 
 interface PackageJsonInfo {
   name: string;
@@ -125,7 +126,17 @@ export function groupModules(records: ImportRecord[]): Group[] {
     }
   }
 
-  return [...groupMap.values()];
+  const groups = [...groupMap.values()];
+
+  // Build folder trees for groups that have a package directory
+  for (const group of groups) {
+    if (group.packageJsonPath) {
+      const packageDir = dirname(group.packageJsonPath);
+      group.folderTree = buildFolderTree(group.id, packageDir, group.modules);
+    }
+  }
+
+  return groups;
 }
 
 // Clear the cache (useful for testing)

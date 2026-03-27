@@ -21,12 +21,21 @@ export interface Cycle {
   length: number;
 }
 
+export interface FolderTreeNode {
+  id: string;
+  label: string;
+  type: 'folder' | 'file';
+  moduleURL?: string;
+  children: FolderTreeNode[];
+}
+
 export interface Group {
   id: string;
   label: string;
   packageJsonPath: string;
   modules: string[];
   isNodeModules: boolean;
+  folderTree?: FolderTreeNode[];
 }
 
 export interface ReportData {
