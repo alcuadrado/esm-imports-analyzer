@@ -49,6 +49,14 @@ var suppressAutoSelect = false;
 // Set of group IDs that have folder trees
 var groupsWithFolderTree = new Set();
 
+function clearSearch() {
+  var input = document.getElementById('search-input');
+  if (input && input.value) {
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+  }
+}
+
 function showOverlay() {
   if (!layoutOverlay) layoutOverlay = document.getElementById('layout-overlay');
   if (layoutOverlay) layoutOverlay.classList.remove('hidden');
@@ -850,6 +858,7 @@ function initGraph(data) {
 
   // Single click selects (with shift/meta for multi-select)
   cy.on('tap', 'node', function (e) {
+    clearSearch();
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
@@ -860,6 +869,7 @@ function initGraph(data) {
 
   cy.on('tap', function (e) {
     if (e.target === cy) {
+      clearSearch();
       cy.nodes().unselect();
       clearSelectionHighlight(cy);
       cy.elements().removeClass('cycle-highlight');
@@ -868,6 +878,7 @@ function initGraph(data) {
 
   cy.on('dbltap', function (e) {
     if (e.target === cy) {
+      clearSearch();
       cy.nodes().unselect();
       clearSelectionHighlight(cy);
       cy.elements().removeClass('cycle-highlight');
@@ -942,6 +953,7 @@ function initGraph(data) {
 }
 
 function highlightCycle(cy, cycle) {
+  clearSearch();
   clearSelectionHighlight(cy);
   cy.elements().removeClass('cycle-highlight');
   cy.nodes().unselect();
@@ -1016,6 +1028,7 @@ function zoomToNode(cy, resolvedURL) {
 }
 
 function focusOnNode(cy, resolvedURL) {
+  clearSearch();
   var node = cy.getElementById(resolvedURL);
   if (node.length === 0) return;
 
