@@ -13,11 +13,27 @@
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
+  "bin": {
+    "esm-imports-analyzer": "dist/cli.js"
+  },
+  "types": "dist/cli.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "node --test test/**/*.test.ts",
+    "test:unit": "node --test test/unit/**/*.test.ts",
+    "test:integration": "node --test test/integration/**/*.test.ts",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "cytoscape": "^3.31.0",
+    "cytoscape-cose-bilkent": "^4.1.0"
   }
 }
