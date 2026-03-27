@@ -252,13 +252,12 @@ function initGraph(data) {
     },
     minZoom: 0.1,
     maxZoom: 5,
-    wheelSensitivity: 0.3,
   });
 
   // Initialize expand-collapse extension
   var expandCollapseApi = null;
   if (typeof cytoscapeExpandCollapse === 'function') {
-    cytoscapeExpandCollapse(cytoscape);
+    cytoscape.use(cytoscapeExpandCollapse);
     expandCollapseApi = cy.expandCollapse({
       layoutBy: {
         name: 'cose-bilkent',

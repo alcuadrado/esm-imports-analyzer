@@ -64,8 +64,14 @@
   </script>
 
   <script src="https://unpkg.com/cytoscape@3.31.0/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/layout-base@1.0.2/layout-base.js"></script>
+  <script src="https://unpkg.com/cose-base@1.0.3/cose-base.js"></script>
   <script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
   <script src="https://unpkg.com/cytoscape-expand-collapse@4.1.1/cytoscape-expand-collapse.js"></script>
+  <script>
+    // Register extensions with cytoscape
+    if (typeof cytoscapeCoseBilkent !== 'undefined') cytoscape.use(cytoscapeCoseBilkent);
+  </script>
 
   <script>
     {{GRAPH_JS}}
