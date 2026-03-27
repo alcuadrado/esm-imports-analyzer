@@ -916,6 +916,16 @@ function initGraph(data) {
       hideContextMenu();
     });
     ctxMenu.appendChild(item);
+
+    var expandItem = document.createElement('div');
+    expandItem.className = 'graph-context-menu-item';
+    expandItem.textContent = 'Expand importers';
+    expandItem.addEventListener('click', function () {
+      hideContextMenu();
+      expandImporters(cy, node);
+    });
+    ctxMenu.appendChild(expandItem);
+
     ctxMenu.style.left = pos.x + 'px';
     ctxMenu.style.top = pos.y + 'px';
     ctxMenu.style.display = 'block';
@@ -931,6 +941,55 @@ function initGraph(data) {
   }
 
   return cy;
+}
+
+function expandImporters(cy, node) {
+  // Collect all module URLs belonging to this node
+  var targetURLs = new Set();
+  if (node.hasClass('module')) {
+    targetURLs.add(node.id());
+  } else if (node.hasClass('group')) {
+    // All modules in this group (including hidden ones)
+    node.descendants('.module').forEach(function (m) { targetURLs.add(m.id()); });
+  } else if (node.hasClass('folder')) {
+    // Modules that are children of this folder (recursively via folder state)
+    function collectFolderModules(fid) {
+      var state = folderState[fid];
+      if (!state) return;
+      for (var i = 0; i < state.children.length; i++) {
+        var child = state.children[i];
+        if (child.type === 'file' && child.moduleURL) {
+          targetURLs.add(child.moduleURL);
+        } else if (child.type === 'folder') {
+          collectFolderModules(child.id);
+        }
+      }
+    }
+    collectFolderModules(node.id());
+  }
+
+  // Find all importer module URLs (sources of edges targeting our modules)
+  var importerURLs = new Set();
+  cy.edges().forEach(function (edge) {
+    if (targetURLs.has(edge.data('target'))) {
+      var src = edge.data('source');
+      if (!targetURLs.has(src)) {
+        importerURLs.add(src);
+      }
+    }
+  });
+
+  if (importerURLs.size === 0) return;
+
+  // Reveal each importer (minimal expansion)
+  suppressAutoSelect = true;
+  importerURLs.forEach(function (url) {
+    revealModule(cy, url);
+  });
+  refreshEdgeVisibility(cy);
+  suppressAutoSelect = false;
+
+  runLayout(cy);
 }
 
 function highlightCycle(cy, cycle) {
