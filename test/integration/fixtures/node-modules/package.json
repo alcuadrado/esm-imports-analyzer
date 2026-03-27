@@ -1,0 +1,1 @@
+{ "name": "node-modules-fixture", "type": "module", "dependencies": { "ms": "^2.1.3" } }
