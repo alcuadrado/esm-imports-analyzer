@@ -357,7 +357,7 @@ function expandAll(cy) {
 }
 
 // --- Directional selection highlighting ---
-var HL_CLASSES = ['hl-selected', 'hl-selected-parent', 'hl-outgoing', 'hl-incoming', 'dimmed'];
+var HL_CLASSES = ['hl-selected', 'hl-outgoing', 'hl-incoming', 'dimmed'];
 
 function clearSelectionHighlight(cy) {
   for (var i = 0; i < HL_CLASSES.length; i++) {
@@ -379,7 +379,7 @@ function applySelectionHighlight(cy) {
   var highlighted = cy.collection();
 
   function isSelectedOrParent(n) {
-    return n.hasClass('hl-selected') || n.hasClass('hl-selected-parent');
+    return n.hasClass('hl-selected');
   }
 
   function traceEdges(node) {
@@ -420,11 +420,7 @@ function applySelectionHighlight(cy) {
   selected.forEach(function (node) {
     var isExpandedGroup = node.hasClass('group') && !collapsedGroups.has(node.id());
 
-    if (isExpandedGroup) {
-      node.addClass('hl-selected-parent');
-    } else {
-      node.addClass('hl-selected');
-    }
+    node.addClass('hl-selected');
     highlighted = highlighted.union(node);
 
     // Trace direct edges from this node
@@ -770,14 +766,6 @@ function initGraph(data) {
       {
         selector: 'node.hl-selected',
         style: { 'border-color': '#cdd6f4', 'border-width': 3 },
-      },
-      {
-        selector: 'node.hl-selected-parent',
-        style: { 'border-color': '#cba6f7', 'border-width': 3 },
-      },
-      {
-        selector: 'node.group.hl-selected-parent:parent',
-        style: { 'border-color': '#cba6f7', 'border-width': 3 },
       },
       {
         selector: 'node.hl-outgoing',
