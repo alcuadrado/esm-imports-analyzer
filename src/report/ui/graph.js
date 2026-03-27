@@ -45,6 +45,7 @@ var groupFolderTrees = {};   // groupId -> FolderTreeNode[] (top-level children)
 var folderState = {};         // folderNodeId -> { children: FolderTreeNode[], groupId: string }
 var parentFolderOf = {};      // nodeId (file or folder) -> parent folderNodeId | null
 var expandedFolders = new Set();
+var suppressAutoSelect = false;
 // Set of group IDs that have folder trees
 var groupsWithFolderTree = new Set();
 
@@ -228,7 +229,7 @@ function expandGroup(cy, groupNode) {
 
   refreshEdgeVisibility(cy);
   maybeRelayout(cy);
-  selectAndHighlight(cy, groupNode);
+  if (!suppressAutoSelect) selectAndHighlight(cy, groupNode);
 }
 
 // Collapse a group: hide ALL children, reset folder expansion state
@@ -254,7 +255,7 @@ function collapseGroup(cy, groupNode) {
 
   refreshEdgeVisibility(cy);
   maybeRelayout(cy);
-  selectAndHighlight(cy, groupNode);
+  if (!suppressAutoSelect) selectAndHighlight(cy, groupNode);
 }
 
 // Expand a folder: hide the folder node, show its children
@@ -277,12 +278,14 @@ function expandFolder(cy, folderNodeId) {
   refreshEdgeVisibility(cy);
   maybeRelayout(cy);
 
-  // Select the newly revealed children
-  cy.nodes().unselect();
-  for (var j = 0; j < childIds.length; j++) {
-    cy.getElementById(childIds[j]).select();
+  if (!suppressAutoSelect) {
+    // Select the newly revealed children
+    cy.nodes().unselect();
+    for (var j = 0; j < childIds.length; j++) {
+      cy.getElementById(childIds[j]).select();
+    }
+    applySelectionHighlight(cy);
   }
-  applySelectionHighlight(cy);
 }
 
 // Ensure a module node is visible by expanding its group and ancestor folders
@@ -938,12 +941,14 @@ function highlightCycle(cy, cycle) {
   cy.elements().removeClass('cycle-highlight');
   cy.nodes().unselect();
 
+  suppressAutoSelect = true;
   // Collapse all, then reveal just enough for cycle members
   collapseAll(cy);
   for (var k = 0; k < cycle.modules.length; k++) {
     revealModule(cy, cycle.modules[k]);
   }
   refreshEdgeVisibility(cy);
+  suppressAutoSelect = false;
 
   runLayout(cy, function () {
     // Apply cycle highlight after layout completes
@@ -978,8 +983,10 @@ function clearHighlights(cy) {
   cy.nodes().unselect();
   clearSelectionHighlight(cy);
   cy.elements().removeClass('cycle-highlight');
+  suppressAutoSelect = true;
   collapseAll(cy);
   refreshEdgeVisibility(cy);
+  suppressAutoSelect = false;
   runLayout(cy, function () {
     cy.animate({ fit: { eles: cy.elements(), padding: 30 }, duration: 300 });
   });
@@ -1010,9 +1017,11 @@ function focusOnNode(cy, resolvedURL) {
   }
 
   // Otherwise: collapse all, reveal just enough, relayout, then select + zoom
+  suppressAutoSelect = true;
   collapseAll(cy);
   revealModule(cy, resolvedURL);
   refreshEdgeVisibility(cy);
+  suppressAutoSelect = false;
   runLayout(cy, function () {
     var n = cy.getElementById(resolvedURL);
     cy.nodes().unselect();
