@@ -195,10 +195,36 @@ body {
   border-color: var(--cycle-highlight);
 }
 
+.cycle-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .cycle-item .cycle-length {
   color: var(--cycle-highlight);
   font-weight: 600;
   font-family: var(--font-mono);
+}
+
+.cycle-copy-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.cycle-item:hover .cycle-copy-btn {
+  opacity: 1;
+}
+
+.cycle-copy-btn:hover {
+  color: var(--text-primary);
 }
 
 .cycle-item .cycle-modules {

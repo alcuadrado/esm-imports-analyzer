@@ -19,6 +19,22 @@ function initCyclesPanel(data, cy) {
     return parts[parts.length - 1] || url;
   }
 
+  function getFullPath(url) {
+    if (url.startsWith('file://')) return url.slice(7);
+    return url;
+  }
+
+  function copyText(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+
   for (var i = 0; i < data.cycles.length; i++) {
     (function (cycle, index) {
       var item = document.createElement('div');
@@ -26,8 +42,20 @@ function initCyclesPanel(data, cy) {
 
       var moduleNames = cycle.modules.map(getShortName).join(' \u2192 ');
       item.innerHTML =
-        '<div><span class="cycle-length">' + cycle.length + ' modules</span></div>' +
+        '<div class="cycle-item-header"><span class="cycle-length">' + cycle.length + ' modules</span></div>' +
         '<div class="cycle-modules">' + escapeHtml(moduleNames + ' \u2192 ' + getShortName(cycle.modules[0])) + '</div>';
+
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'cycle-copy-btn';
+      copyBtn.title = 'Copy cycle paths';
+      copyBtn.textContent = '\u2398';
+      copyBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var fullPaths = cycle.modules.map(getFullPath);
+        fullPaths.push(getFullPath(cycle.modules[0]));
+        copyText(fullPaths.join(' \u2192 '));
+      });
+      item.querySelector('.cycle-item-header').appendChild(copyBtn);
 
       item.addEventListener('click', function () {
         if (activeItem) activeItem.classList.remove('active');
