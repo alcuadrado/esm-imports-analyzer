@@ -815,21 +815,6 @@ function initGraph(data) {
     tooltip.style.display = 'none';
   });
 
-  cy.on('mouseover', 'edge', function (e) {
-    tooltip.innerHTML = '<div class="tooltip-path">' + escapeHtml(e.target.data('specifier')) + '</div>';
-    tooltip.style.display = 'block';
-  });
-
-  cy.on('mousemove', 'edge', function (e) {
-    var pos = e.renderedPosition || e.position;
-    tooltip.style.left = (pos.x + 16) + 'px';
-    tooltip.style.top = (pos.y + 16) + 'px';
-  });
-
-  cy.on('mouseout', 'edge', function () {
-    tooltip.style.display = 'none';
-  });
-
   // Single click selects (with shift/meta for multi-select)
   cy.on('tap', 'node', function (e) {
     clearSearch();
