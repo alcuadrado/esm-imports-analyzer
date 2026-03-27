@@ -872,7 +872,6 @@ function initGraph(data) {
       clearSearch();
       cy.nodes().unselect();
       clearSelectionHighlight(cy);
-      cy.elements().removeClass('cycle-highlight');
     }
   });
 
@@ -881,7 +880,6 @@ function initGraph(data) {
       clearSearch();
       cy.nodes().unselect();
       clearSelectionHighlight(cy);
-      cy.elements().removeClass('cycle-highlight');
       cy.animate({ fit: { eles: cy.elements(), padding: 30 }, duration: 300 });
     }
   });
