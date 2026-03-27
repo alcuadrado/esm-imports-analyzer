@@ -2,6 +2,7 @@
 
 function initTable(data, cy) {
   var tableBody = document.getElementById('table-body');
+  var countInput = document.getElementById('slowest-count');
   var maxTime = 0;
 
   // Compute max time for bar widths
@@ -20,31 +21,22 @@ function initTable(data, cy) {
   }
   indexTree(data.tree);
 
-  // Compute 20 slowest unique modules
+  // Pre-sort all unique modules by time descending
+  var allSlowest = [];
   var seen = {};
-  var slowest = [];
   var modulesCopy = data.modules.slice().sort(function (a, b) {
     return (b.loadEndTime - b.resolveStartTime) - (a.loadEndTime - a.resolveStartTime);
   });
-  for (var i = 0; i < modulesCopy.length && slowest.length < 20; i++) {
+  for (var i = 0; i < modulesCopy.length; i++) {
     var url = modulesCopy[i].resolvedURL;
-    if (!seen[url]) {
+    if (!seen[url] && nodeByURL[url]) {
       seen[url] = true;
-      slowest.push(url);
+      allSlowest.push(nodeByURL[url]);
     }
   }
 
-  // Build root list: start with natural roots, then promote slow files not already roots
-  var rootURLs = {};
-  var tree = data.tree.slice();
-  for (var i = 0; i < tree.length; i++) {
-    rootURLs[tree[i].resolvedURL] = true;
-  }
-  for (var i = 0; i < slowest.length; i++) {
-    if (!rootURLs[slowest[i]] && nodeByURL[slowest[i]]) {
-      tree.push(nodeByURL[slowest[i]]);
-      rootURLs[slowest[i]] = true;
-    }
+  function buildRoots(count) {
+    return allSlowest.slice(0, count);
   }
 
   var currentSort = { column: 'time', direction: 'desc' };
@@ -147,11 +139,17 @@ function initTable(data, cy) {
 
   function renderTable() {
     tableBody.innerHTML = '';
-    var roots = sortNodes(tree, currentSort);
+    var count = parseInt(countInput.value, 10) || 20;
+    var roots = sortNodes(buildRoots(count), currentSort);
     for (var i = 0; i < roots.length; i++) {
       renderRow(roots[i], 0, tableBody);
     }
   }
+
+  // Count input change
+  countInput.addEventListener('input', function () {
+    renderTable();
+  });
 
   // Column sorting
   document.querySelectorAll('.table-header-row span[data-sort]').forEach(function (header) {

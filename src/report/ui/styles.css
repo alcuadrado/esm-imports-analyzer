@@ -341,6 +341,48 @@ body {
   overflow: hidden;
 }
 
+.table-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.table-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.table-count-control {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.table-count-control input {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  width: 50px;
+  text-align: right;
+  outline: none;
+}
+
+.table-count-control input:focus {
+  border-color: var(--accent);
+}
+
 .table-header-row {
   display: flex;
   padding: 6px 16px;
