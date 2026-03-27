@@ -244,6 +244,77 @@ function collapseAll(cy) {
   refreshEdgeVisibility(cy);
 }
 
+// --- Directional selection highlighting ---
+var HL_CLASSES = ['hl-selected', 'hl-outgoing', 'hl-incoming', 'dimmed'];
+
+function clearSelectionHighlight(cy) {
+  for (var i = 0; i < HL_CLASSES.length; i++) {
+    cy.elements().removeClass(HL_CLASSES[i]);
+  }
+}
+
+function applySelectionHighlight(cy) {
+  var selected = cy.nodes(':selected');
+  if (selected.length === 0) {
+    clearSelectionHighlight(cy);
+    return;
+  }
+
+  // Clear previous highlight classes (but keep :selected state)
+  for (var i = 0; i < HL_CLASSES.length; i++) {
+    cy.elements().removeClass(HL_CLASSES[i]);
+  }
+
+  var highlighted = cy.collection();
+
+  selected.forEach(function (node) {
+    node.addClass('hl-selected');
+    highlighted = highlighted.union(node);
+
+    // Outgoing: edges where this node is the source, and their targets
+    var outEdges = node.outgoers('edge:visible');
+    outEdges.addClass('hl-outgoing');
+    highlighted = highlighted.union(outEdges);
+    outEdges.targets().forEach(function (t) {
+      if (!t.hasClass('hl-selected')) t.addClass('hl-outgoing');
+      highlighted = highlighted.union(t);
+    });
+
+    // Incoming: edges where this node is the target, and their sources
+    var inEdges = node.incomers('edge:visible');
+    inEdges.addClass('hl-incoming');
+    highlighted = highlighted.union(inEdges);
+    inEdges.sources().forEach(function (s) {
+      if (!s.hasClass('hl-selected') && !s.hasClass('hl-outgoing')) s.addClass('hl-incoming');
+      highlighted = highlighted.union(s);
+    });
+
+    // For group nodes: also follow meta-edges
+    if (node.hasClass('group')) {
+      node.connectedEdges('.meta-edge:visible').forEach(function (me) {
+        var isOut = me.source().id() === node.id();
+        if (isOut) {
+          me.addClass('hl-outgoing');
+          if (!me.target().hasClass('hl-selected')) me.target().addClass('hl-outgoing');
+        } else {
+          me.addClass('hl-incoming');
+          if (!me.source().hasClass('hl-selected')) me.source().addClass('hl-incoming');
+        }
+        highlighted = highlighted.union(me).union(me.source()).union(me.target());
+      });
+    }
+  });
+
+  // Dim everything not highlighted
+  cy.elements().not(highlighted).addClass('dimmed');
+  // Don't dim parent groups of highlighted children
+  highlighted.forEach(function (ele) {
+    if (ele.isNode() && ele.parent().length > 0) {
+      ele.parent().removeClass('dimmed');
+    }
+  });
+}
+
 function initGraph(data) {
   var container = document.getElementById('cy');
   var tooltip = document.getElementById('graph-tooltip');
@@ -486,29 +557,62 @@ function initGraph(data) {
           'border-width': 3,
         },
       },
+      // Selection highlighting — directional
       {
-        selector: 'node.highlight',
+        selector: 'node.hl-selected',
+        style: {
+          'border-color': '#cdd6f4',
+          'border-width': 3,
+        },
+      },
+      {
+        selector: 'node.hl-outgoing',
         style: {
           'border-color': '#89b4fa',
           'border-width': 3,
         },
       },
       {
+        selector: 'edge.hl-outgoing',
+        style: {
+          'line-color': '#89b4fa',
+          'target-arrow-color': '#89b4fa',
+          'width': 2,
+          'z-index': 5,
+        },
+      },
+      {
+        selector: 'node.hl-incoming',
+        style: {
+          'border-color': '#a6e3a1',
+          'border-width': 3,
+        },
+      },
+      {
+        selector: 'edge.hl-incoming',
+        style: {
+          'line-color': '#a6e3a1',
+          'target-arrow-color': '#a6e3a1',
+          'width': 2,
+          'z-index': 5,
+        },
+      },
+      {
         selector: 'node.dimmed',
         style: {
-          'opacity': 0.3,
+          'opacity': 0.2,
         },
       },
       {
         selector: 'edge.dimmed',
         style: {
-          'opacity': 0.15,
+          'opacity': 0.08,
         },
       },
       {
         selector: ':selected',
         style: {
-          'border-color': '#89b4fa',
+          'border-color': '#cdd6f4',
           'border-width': 3,
         },
       },
@@ -569,18 +673,25 @@ function initGraph(data) {
     tooltip.style.display = 'none';
   });
 
-  // Click node to highlight connections
-  cy.on('tap', 'node.module', function (e) {
+  // Single click selects (with shift/meta for multi-select)
+  cy.on('tap', 'node', function (e) {
     var node = e.target;
-    cy.elements().removeClass('dimmed highlight');
-    var connected = node.connectedEdges().connectedNodes().union(node).union(node.connectedEdges());
-    cy.elements().not(connected).addClass('dimmed');
-    node.addClass('highlight');
+    var originalEvent = e.originalEvent;
+    var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
+
+    if (!additive) {
+      cy.nodes().unselect();
+    }
+    node.select();
+    applySelectionHighlight(cy);
   });
 
+  // Click background to clear
   cy.on('tap', function (e) {
     if (e.target === cy) {
-      cy.elements().removeClass('dimmed highlight cycle-highlight');
+      cy.nodes().unselect();
+      clearSelectionHighlight(cy);
+      cy.elements().removeClass('cycle-highlight');
     }
   });
 
@@ -594,7 +705,8 @@ function initGraph(data) {
 }
 
 function highlightCycle(cy, cycle) {
-  cy.elements().removeClass('dimmed highlight cycle-highlight');
+  clearSelectionHighlight(cy);
+  cy.elements().removeClass('cycle-highlight');
 
   // Expand groups containing cycle members so they become visible
   for (var k = 0; k < cycle.modules.length; k++) {
@@ -637,7 +749,8 @@ function highlightCycle(cy, cycle) {
 }
 
 function clearHighlights(cy) {
-  cy.elements().removeClass('dimmed highlight cycle-highlight');
+  clearSelectionHighlight(cy);
+  cy.elements().removeClass('cycle-highlight');
 }
 
 function zoomToNode(cy, resolvedURL) {
@@ -647,10 +760,9 @@ function zoomToNode(cy, resolvedURL) {
     if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) {
       expandGroup(cy, node.parent());
     }
-    cy.elements().removeClass('dimmed highlight cycle-highlight');
-    node.addClass('highlight');
-    var connected = node.connectedEdges().connectedNodes().union(node).union(node.connectedEdges());
-    cy.elements().not(connected).addClass('dimmed');
+    cy.nodes().unselect();
+    node.select();
+    applySelectionHighlight(cy);
     cy.animate({
       center: { eles: node },
       zoom: 2,
