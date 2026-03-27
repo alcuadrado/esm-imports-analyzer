@@ -140,6 +140,59 @@ function initTable(data, cy) {
   });
 
   renderTable();
+  renderSlowest();
+
+  function renderSlowest() {
+    var slowestBody = document.getElementById('slowest-body');
+    if (!slowestBody) return;
+
+    // Build flat list of unique modules with timing
+    var seen = {};
+    var allMods = [];
+    for (var i = 0; i < data.modules.length; i++) {
+      var m = data.modules[i];
+      if (seen[m.resolvedURL]) continue;
+      seen[m.resolvedURL] = true;
+      allMods.push({
+        url: m.resolvedURL,
+        specifier: m.specifier,
+        totalTime: m.loadEndTime - m.resolveStartTime,
+      });
+    }
+    allMods.sort(function (a, b) { return b.totalTime - a.totalTime; });
+    var top20 = allMods.slice(0, 20);
+
+    for (var j = 0; j < top20.length; j++) {
+      (function (mod) {
+        var row = document.createElement('div');
+        row.className = 'table-row';
+        row.dataset.url = mod.url;
+
+        var timeColor = getTimeColor(mod.totalTime);
+        var barWidth = maxTime > 0 ? Math.max(2, (mod.totalTime / maxTime) * 60) : 2;
+
+        row.innerHTML =
+          '<div class="module-name">' +
+            '<span class="module-label" title="' + escapeAttr(mod.url) + '">' + escapeHtml(mod.specifier) + '</span>' +
+          '</div>' +
+          '<div class="time-value">' +
+            '<span class="time-bar" style="width: ' + barWidth + 'px; background: ' + timeColor + '"></span>' +
+            mod.totalTime.toFixed(2) + ' ms' +
+          '</div>';
+
+        row.addEventListener('click', function () {
+          if (cy) focusOnNode(cy, mod.url);
+          var rows = document.querySelectorAll('.table-row');
+          for (var k = 0; k < rows.length; k++) {
+            rows[k].classList.remove('highlighted');
+          }
+          row.classList.add('highlighted');
+        });
+
+        slowestBody.appendChild(row);
+      })(top20[j]);
+    }
+  }
 
   function escapeHtml(str) {
     var div = document.createElement('div');
@@ -153,14 +206,22 @@ function initTable(data, cy) {
 
   return {
     filter: function (query) {
-      // Only filter top-level rows (depth 0), not expanded children
-      var rows = tableBody.querySelectorAll('.table-row[data-depth="0"]');
       var lowerQuery = query.toLowerCase();
+
+      // Filter slowest section
+      var slowestRows = document.querySelectorAll('#slowest-body .table-row');
+      for (var s = 0; s < slowestRows.length; s++) {
+        var sUrl = (slowestRows[s].dataset.url || '').toLowerCase();
+        var sText = slowestRows[s].textContent.toLowerCase();
+        slowestRows[s].style.display = (!query || sUrl.indexOf(lowerQuery) !== -1 || sText.indexOf(lowerQuery) !== -1) ? '' : 'none';
+      }
+
+      // Filter import tree: only top-level rows (depth 0)
+      var rows = tableBody.querySelectorAll('.table-row[data-depth="0"]');
       for (var i = 0; i < rows.length; i++) {
         var url = (rows[i].dataset.url || '').toLowerCase();
         var text = rows[i].textContent.toLowerCase();
         var match = !query || url.indexOf(lowerQuery) !== -1 || text.indexOf(lowerQuery) !== -1;
-        // Hide/show the row and its sibling child-container
         rows[i].style.display = match ? '' : 'none';
         var next = rows[i].nextElementSibling;
         if (next && next.classList.contains('child-container')) {

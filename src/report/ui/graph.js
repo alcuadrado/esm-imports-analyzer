@@ -936,6 +936,30 @@ function zoomToNode(cy, resolvedURL) {
   }
 }
 
+// Collapse everything, reveal just enough to show the target node,
+// relayout, then select and zoom.
+function focusOnNode(cy, resolvedURL) {
+  var node = cy.getElementById(resolvedURL);
+  if (node.length === 0) return;
+
+  // Collapse everything without triggering auto-relayout per group
+  var savedAuto = autoRelayout;
+  autoRelayout = false;
+  collapseAll(cy);
+  autoRelayout = savedAuto;
+
+  // Reveal just the target module (expands its group + ancestor folders)
+  revealModule(cy, resolvedURL);
+
+  // Relayout, then select and zoom after layout completes
+  runLayout(cy, function () {
+    cy.nodes().unselect();
+    node.select();
+    applySelectionHighlight(cy);
+    cy.animate({ center: { eles: node }, zoom: 2, duration: 300 });
+  });
+}
+
 // Search: highlight matching nodes in the graph. If a match is inside a
 // collapsed group or folder, highlight that collapsed ancestor instead.
 function filterBySearch(cy, query) {
