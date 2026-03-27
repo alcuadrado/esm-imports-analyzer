@@ -1,4 +1,4 @@
-import type { ImportRecord, ModuleNode } from '../types.ts';
+import type { ImportRecord } from '../types.ts';
 
 export interface TimingEntry {
   resolvedURL: string;
@@ -17,7 +17,7 @@ export function computeRankedList(records: ImportRecord[]): TimingEntry[] {
       entries.push({
         resolvedURL: record.resolvedURL,
         specifier: record.specifier,
-        totalTime: record.loadEndTime - record.resolveStartTime,
+        totalTime: (record.resolveEndTime - record.resolveStartTime) + (record.loadEndTime - record.loadStartTime),
       });
     }
   }
@@ -28,10 +28,13 @@ export function computeRankedList(records: ImportRecord[]): TimingEntry[] {
   return entries;
 }
 
-export function computeTotalTime(tree: ModuleNode[]): number {
-  let max = 0;
-  for (const root of tree) {
-    max = Math.max(max, root.totalTime);
+export function computeTotalTime(records: ImportRecord[]): number {
+  if (records.length === 0) return 0;
+  let minStart = Infinity;
+  let maxEnd = -Infinity;
+  for (const record of records) {
+    if (record.resolveStartTime < minStart) minStart = record.resolveStartTime;
+    if (record.loadEndTime > maxEnd) maxEnd = record.loadEndTime;
   }
-  return max;
+  return maxEnd - minStart;
 }

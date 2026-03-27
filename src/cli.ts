@@ -190,7 +190,7 @@ async function main(): Promise<void> {
   const cycles = detectCycles(records);
   const groups = groupModules(records);
   const rankedList = computeRankedList(records);
-  const totalTime = computeTotalTime(tree);
+  const totalTime = computeTotalTime(records);
 
   const reportData: ReportData = {
     metadata: {

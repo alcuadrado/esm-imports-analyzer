@@ -105,7 +105,7 @@ describe('buildTree', () => {
   it('handles duplicate imports (cached) — first occurrence wins', () => {
     const records = [
       makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', resolveStartTime: 0, loadEndTime: 100 }),
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 5, loadStartTime: 6, loadEndTime: 50 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 5, resolveEndTime: 6, loadStartTime: 6, loadEndTime: 50 }),
       // Same module imported again (cached, near-zero timing)
       makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 60, loadStartTime: 60, loadEndTime: 60.1 }),
     ];

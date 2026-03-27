@@ -17,7 +17,7 @@ export function buildTree(records: ImportRecord[]): ModuleNode[] {
     nodeByURL.set(url, {
       resolvedURL: url,
       specifier: record.specifier,
-      totalTime: record.loadEndTime - record.resolveStartTime,
+      totalTime: (record.resolveEndTime - record.resolveStartTime) + (record.loadEndTime - record.loadStartTime),
       children: [],
       parentURL: record.parentURL,
     });

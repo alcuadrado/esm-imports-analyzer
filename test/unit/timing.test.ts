@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeRankedList, computeTotalTime } from '../../src/analysis/timing.ts';
-import { buildTree } from '../../src/analysis/tree-builder.ts';
 import type { ImportRecord } from '../../src/types.ts';
 
 function makeRecord(url: string, resolveStart: number, loadEnd: number, parent?: string): ImportRecord {
@@ -29,7 +28,7 @@ describe('computeRankedList', () => {
     assert.equal(ranked[2]!.resolvedURL, 'a');
   });
 
-  it('computes totalTime as loadEndTime - resolveStartTime', () => {
+  it('computes totalTime as self-time (resolve + load)', () => {
     const records = [makeRecord('a', 10, 50)];
     const ranked = computeRankedList(records);
     assert.equal(ranked[0]!.totalTime, 40);
@@ -76,16 +75,15 @@ describe('computeRankedList', () => {
 });
 
 describe('computeTotalTime', () => {
-  it('returns max root time', () => {
+  it('returns total execution span', () => {
     const records = [
       makeRecord('a', 0, 100),
-      makeRecord('b', 0, 50),
+      makeRecord('b', 10, 80),
     ];
-    const tree = buildTree(records);
-    assert.equal(computeTotalTime(tree), 100);
+    assert.equal(computeTotalTime(records), 100); // max(loadEnd) - min(resolveStart) = 100 - 0
   });
 
-  it('returns 0 for empty tree', () => {
+  it('returns 0 for empty records', () => {
     assert.equal(computeTotalTime([]), 0);
   });
 });

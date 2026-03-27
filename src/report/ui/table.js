@@ -7,7 +7,7 @@ function initTable(data, cy) {
 
   // Compute max time for bar widths
   for (var i = 0; i < data.modules.length; i++) {
-    var t = data.modules[i].loadEndTime - data.modules[i].resolveStartTime;
+    var t = (data.modules[i].resolveEndTime - data.modules[i].resolveStartTime) + (data.modules[i].loadEndTime - data.modules[i].loadStartTime);
     if (t > maxTime) maxTime = t;
   }
 
@@ -25,7 +25,7 @@ function initTable(data, cy) {
   var allSlowest = [];
   var seen = {};
   var modulesCopy = data.modules.slice().sort(function (a, b) {
-    return (b.loadEndTime - b.resolveStartTime) - (a.loadEndTime - a.resolveStartTime);
+    return ((b.resolveEndTime - b.resolveStartTime) + (b.loadEndTime - b.loadStartTime)) - ((a.resolveEndTime - a.resolveStartTime) + (a.loadEndTime - a.loadStartTime));
   });
   for (var i = 0; i < modulesCopy.length; i++) {
     var url = modulesCopy[i].resolvedURL;

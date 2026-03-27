@@ -512,7 +512,7 @@ function initGraph(data) {
 
   var maxTime = 0;
   for (var ti = 0; ti < data.modules.length; ti++) {
-    var time = data.modules[ti].loadEndTime - data.modules[ti].resolveStartTime;
+    var time = (data.modules[ti].resolveEndTime - data.modules[ti].resolveStartTime) + (data.modules[ti].loadEndTime - data.modules[ti].loadStartTime);
     if (time > maxTime) maxTime = time;
   }
 
@@ -526,7 +526,7 @@ function initGraph(data) {
     var g = groupMap.get(m.resolvedURL);
     if (g) {
       var gid = 'group-' + g.id;
-      groupTotalTimes[gid] = (groupTotalTimes[gid] || 0) + (m.loadEndTime - m.resolveStartTime);
+      groupTotalTimes[gid] = (groupTotalTimes[gid] || 0) + (m.resolveEndTime - m.resolveStartTime) + (m.loadEndTime - m.loadStartTime);
     }
   }
 
@@ -579,7 +579,7 @@ function initGraph(data) {
     seenModules.add(mod.resolvedURL);
 
     var modGroup = groupMap.get(mod.resolvedURL);
-    var totalTime = mod.loadEndTime - mod.resolveStartTime;
+    var totalTime = (mod.resolveEndTime - mod.resolveStartTime) + (mod.loadEndTime - mod.loadStartTime);
     var timeRatio = maxTime > 0 ? totalTime / maxTime : 0;
     var isBuiltin = mod.resolvedURL.startsWith('node:');
 
