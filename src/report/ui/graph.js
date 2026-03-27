@@ -57,14 +57,42 @@ function runLayout(cy, callback) {
   var nodes = [];
   var edges = [];
   var visibleNodeIds = new Set();
+  // Track which visible group nodes are expanded (have visible children).
+  // Expanded groups should NOT be sent as dagre nodes — cytoscape auto-sizes
+  // them to wrap their children.  Only collapsed groups act as leaf nodes.
+  var expandedGroupIds = new Set();
 
   cy.nodes(':visible').forEach(function (node) {
+    var isGroup = node.hasClass('group');
+    if (isGroup && !collapsedGroups.has(node.id())) {
+      // Expanded group — skip it; dagre will use it only as a compound parent
+      expandedGroupIds.add(node.id());
+      visibleNodeIds.add(node.id());
+      return;
+    }
     visibleNodeIds.add(node.id());
+    // For child nodes inside an expanded group, tell dagre about the parent
+    var parentId = null;
+    if (node.parent().length > 0 && expandedGroupIds.has(node.parent().id())) {
+      parentId = node.parent().id();
+    }
     nodes.push({
       id: node.id(),
       width: node.outerWidth() || 60,
       height: node.outerHeight() || 40,
-      parent: node.parent().length > 0 && node.parent().visible() ? node.parent().id() : null,
+      parent: parentId,
+    });
+  });
+
+  // Also add expanded groups as dagre compound parents (no width/height — dagre
+  // will size them from their children)
+  expandedGroupIds.forEach(function (gid) {
+    nodes.push({
+      id: gid,
+      width: 0,
+      height: 0,
+      parent: null,
+      isCompound: true,
     });
   });
 
@@ -86,6 +114,8 @@ function runLayout(cy, callback) {
     var positions = e.data;
     cy.batch(function () {
       cy.nodes().forEach(function (node) {
+        // Never set position on expanded group nodes — let cytoscape auto-size
+        if (expandedGroupIds.has(node.id())) return;
         var pos = positions[node.id()];
         if (pos) node.position(pos);
       });
