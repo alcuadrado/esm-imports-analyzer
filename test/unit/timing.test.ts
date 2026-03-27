@@ -62,6 +62,17 @@ describe('computeRankedList', () => {
     assert.equal(ranked[1]!.resolvedURL, 'b');
     assert.equal(ranked[2]!.resolvedURL, 'c');
   });
+
+  it('zero-time modules (cached) rank last', () => {
+    const records = [
+      makeRecord('a', 0, 50),
+      makeRecord('b', 0, 0), // zero time (cached)
+      makeRecord('c', 0, 30),
+    ];
+    const ranked = computeRankedList(records);
+    assert.equal(ranked[ranked.length - 1]!.resolvedURL, 'b');
+    assert.equal(ranked[ranked.length - 1]!.totalTime, 0);
+  });
 });
 
 describe('computeTotalTime', () => {

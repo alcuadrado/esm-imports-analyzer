@@ -70,6 +70,14 @@ describe('CLI', () => {
     assert.ok(existsSync(output));
   });
 
+  it('uses default output path when --output not specified', () => {
+    const defaultPath = resolve('esm-imports-report.html');
+    tempPaths.push(defaultPath);
+    const result = runCli(['--', 'node', resolve(fixturesDir, 'simple/a.js')]);
+    assert.equal(result.exitCode, 0);
+    assert.ok(existsSync(defaultPath), 'Should write to default path ./esm-imports-report.html');
+  });
+
   it('still generates report on non-zero child exit code', () => {
     const output = createTempOutputPath();
     tempPaths.push(output);

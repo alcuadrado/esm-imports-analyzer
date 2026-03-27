@@ -101,4 +101,27 @@ describe('buildTree', () => {
     assert.equal(tree[0]!.children[0]!.resolvedURL, 'file:///b.js');
     assert.equal(tree[0]!.children[1]!.resolvedURL, 'file:///c.js');
   });
+
+  it('handles duplicate imports (cached) — first occurrence wins', () => {
+    const records = [
+      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', resolveStartTime: 0, loadEndTime: 100 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 5, loadStartTime: 6, loadEndTime: 50 }),
+      // Same module imported again (cached, near-zero timing)
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 60, loadStartTime: 60, loadEndTime: 60.1 }),
+    ];
+    const tree = buildTree(records);
+    // b should appear once under a with real timing from first import
+    assert.equal(tree[0]!.children.length, 1);
+    assert.equal(tree[0]!.children[0]!.totalTime, 45); // 50 - 5
+  });
+
+  it('handles single module (entry point only)', () => {
+    const records = [
+      makeRecord({ resolvedURL: 'file:///entry.js', specifier: './entry.js' }),
+    ];
+    const tree = buildTree(records);
+    assert.equal(tree.length, 1);
+    assert.equal(tree[0]!.children.length, 0);
+    assert.equal(tree[0]!.resolvedURL, 'file:///entry.js');
+  });
 });

@@ -89,4 +89,50 @@ describe('detectCycles', () => {
     const cycles = detectCycles(records);
     assert.ok(cycles.length >= 2);
   });
+
+  it('detects overlapping cycles', () => {
+    // A -> B -> C -> A and B -> D -> B
+    const records = [
+      makeRecord('a', null),
+      makeRecord('b', 'a'),
+      makeRecord('c', 'b'),
+      makeRecord('a', 'c'), // back-edge: C -> A
+      makeRecord('d', 'b'),
+      makeRecord('b', 'd'), // back-edge: D -> B
+    ];
+    const cycles = detectCycles(records);
+    assert.ok(cycles.length >= 2, `Expected at least 2 cycles, got ${cycles.length}`);
+  });
+
+  it('handles large cycle (10+ modules) efficiently', () => {
+    // Create a 15-module cycle: m0 -> m1 -> ... -> m14 -> m0
+    const records: ImportRecord[] = [];
+    for (let i = 0; i < 15; i++) {
+      records.push(makeRecord(`m${i}`, i === 0 ? null : `m${i - 1}`));
+    }
+    records.push(makeRecord('m0', 'm14')); // back-edge
+
+    const start = performance.now();
+    const cycles = detectCycles(records);
+    const elapsed = performance.now() - start;
+
+    assert.ok(cycles.length >= 1, 'Should detect at least one cycle');
+    assert.ok(elapsed < 100, `Should complete in <100ms, took ${elapsed.toFixed(1)}ms`);
+  });
+
+  it('detects cycle in subgraph only', () => {
+    // Main: a -> b -> c (acyclic). Subtree of c: d -> e -> d (cycle)
+    const records = [
+      makeRecord('a', null),
+      makeRecord('b', 'a'),
+      makeRecord('c', 'b'),
+      makeRecord('d', 'c'),
+      makeRecord('e', 'd'),
+      makeRecord('d', 'e'), // back-edge in subgraph
+    ];
+    const cycles = detectCycles(records);
+    assert.ok(cycles.length >= 1);
+    const cycle = cycles.find(c => c.modules.includes('d') && c.modules.includes('e'));
+    assert.ok(cycle, 'Should detect the d-e cycle');
+  });
 });

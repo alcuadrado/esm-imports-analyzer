@@ -66,6 +66,14 @@ describe('loader integration', () => {
     }
   });
 
+  it('captures node_modules imports', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'node-modules/a.js'));
+    assert.ok(result.records.length >= 2, `Expected at least 2 records, got ${result.records.length}`);
+    // Should capture the ms package
+    const msRecord = result.records.find(r => r.resolvedURL.includes('node_modules') && r.resolvedURL.includes('ms'));
+    assert.ok(msRecord, 'Should capture ms package import');
+  });
+
   it('produces valid JSON import records', () => {
     const result = runWithLoader(resolve(fixturesDir, 'simple/a.js'));
     for (const record of result.records) {

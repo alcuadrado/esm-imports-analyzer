@@ -87,4 +87,44 @@ describe('groupModules', () => {
     assert.ok(barGroup);
     assert.notEqual(fooGroup.id, barGroup.id);
   });
+
+  it('groups single package project correctly', () => {
+    const fixtureDir = resolve('test/integration/fixtures/simple');
+    const aURL = pathToFileURL(resolve(fixtureDir, 'a.js')).href;
+    const bURL = pathToFileURL(resolve(fixtureDir, 'b.js')).href;
+    const cURL = pathToFileURL(resolve(fixtureDir, 'c.js')).href;
+
+    const records = [
+      makeRecord(aURL),
+      makeRecord(bURL, aURL),
+      makeRecord(cURL, bURL),
+    ];
+    const groups = groupModules(records);
+    // All files should be in one group
+    const simpleGroup = groups.find(g => g.label === 'simple-fixture');
+    assert.ok(simpleGroup);
+    assert.equal(simpleGroup.modules.length, 3);
+  });
+
+  it('groups scoped packages', () => {
+    // Create a fake scoped package path
+    const fixtureDir = resolve('test/integration/fixtures/node-modules');
+    // Use the ms package as a proxy — we just need to verify grouping logic
+    const msURL = pathToFileURL(resolve(fixtureDir, 'node_modules', 'ms', 'index.js')).href;
+    const records = [makeRecord(msURL)];
+    const groups = groupModules(records);
+    const msGroup = groups.find(g => g.label === 'ms');
+    assert.ok(msGroup, 'Should find ms group');
+    assert.ok(msGroup.isNodeModules, 'Should be flagged as node_modules');
+  });
+
+  it('falls back to Ungrouped when no package.json found', () => {
+    // Use a URL in /tmp which has no package.json
+    const tmpURL = pathToFileURL('/tmp/no-package-json-here/test.js').href;
+    const records = [makeRecord(tmpURL)];
+    const groups = groupModules(records);
+    const ungrouped = groups.find(g => g.label === 'Ungrouped');
+    assert.ok(ungrouped, 'Should have Ungrouped group');
+    assert.ok(ungrouped.modules.includes(tmpURL));
+  });
 });

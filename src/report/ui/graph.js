@@ -23,16 +23,51 @@ function initGraph(data) {
     if (time > maxTime) maxTime = time;
   }
 
+  // Compute per-group total time and edge counts
+  var groupTotalTimes = {};
+  var seenForGroupTime = {};
+  for (var mi = 0; mi < data.modules.length; mi++) {
+    var m = data.modules[mi];
+    if (seenForGroupTime[m.resolvedURL]) continue;
+    seenForGroupTime[m.resolvedURL] = true;
+    var g = groupMap.get(m.resolvedURL);
+    if (g) {
+      var gid = 'group-' + g.id;
+      groupTotalTimes[gid] = (groupTotalTimes[gid] || 0) + (m.loadEndTime - m.resolveStartTime);
+    }
+  }
+
+  // Count inter-group edges
+  var groupEdgeCounts = {};
+  for (var ei = 0; ei < data.modules.length; ei++) {
+    var em = data.modules[ei];
+    if (em.parentURL) {
+      var srcGroup = groupMap.get(em.parentURL);
+      var tgtGroup = groupMap.get(em.resolvedURL);
+      if (srcGroup && tgtGroup && srcGroup.id !== tgtGroup.id) {
+        var sgid = 'group-' + srcGroup.id;
+        var tgid = 'group-' + tgtGroup.id;
+        groupEdgeCounts[sgid] = (groupEdgeCounts[sgid] || 0) + 1;
+        groupEdgeCounts[tgid] = (groupEdgeCounts[tgid] || 0) + 1;
+      }
+    }
+  }
+
   // Add group (compound) nodes
   for (const group of data.groups) {
+    var groupNodeId = 'group-' + group.id;
+    var groupTime = (groupTotalTimes[groupNodeId] || 0).toFixed(1);
+    var edgeCount = groupEdgeCounts[groupNodeId] || 0;
     elements.push({
       group: 'nodes',
       data: {
-        id: 'group-' + group.id,
-        label: group.label + ' (' + group.modules.length + ')',
+        id: groupNodeId,
+        label: group.label + ' (' + group.modules.length + ' modules, ' + groupTime + ' ms, ' + edgeCount + ' edges)',
         isGroup: true,
         groupId: group.id,
         moduleCount: group.modules.length,
+        groupTotalTime: groupTotalTimes[groupNodeId] || 0,
+        groupEdgeCount: edgeCount,
       },
       classes: group.isNodeModules ? 'group node-modules' : 'group',
     });
@@ -220,6 +255,39 @@ function initGraph(data) {
     wheelSensitivity: 0.3,
   });
 
+  // Initialize expand-collapse extension
+  var expandCollapseApi = null;
+  if (typeof cytoscapeExpandCollapse === 'function') {
+    cytoscapeExpandCollapse(cytoscape);
+    expandCollapseApi = cy.expandCollapse({
+      layoutBy: {
+        name: 'cose-bilkent',
+        animate: false,
+        nodeDimensionsIncludeLabels: true,
+        idealEdgeLength: 80,
+        nodeRepulsion: 8000,
+      },
+      fisheye: false,
+      animate: false,
+      undoable: false,
+      cueEnabled: true,
+    });
+    // Collapse all groups by default
+    expandCollapseApi.collapseAll();
+  }
+
+  // Double-click to expand/collapse groups
+  cy.on('dbltap', 'node.group', function (e) {
+    var node = e.target;
+    if (expandCollapseApi) {
+      if (node.hasClass('cy-expand-collapse-collapsed-node')) {
+        expandCollapseApi.expand(node);
+      } else {
+        expandCollapseApi.collapse(node);
+      }
+    }
+  });
+
   // Tooltip handling
   cy.on('mouseover', 'node.module', function (e) {
     const node = e.target;
@@ -285,6 +353,20 @@ function initGraph(data) {
 
 function highlightCycle(cy, cycle) {
   cy.elements().removeClass('dimmed highlight cycle-highlight');
+
+  // Expand any groups containing cycle members
+  var api = cy.expandCollapse ? cy.expandCollapse('get') : null;
+  if (api) {
+    for (var k = 0; k < cycle.modules.length; k++) {
+      var n = cy.getElementById(cycle.modules[k]);
+      if (n.length > 0 && n.parent().length > 0) {
+        var parentNode = n.parent();
+        if (parentNode.hasClass('cy-expand-collapse-collapsed-node')) {
+          api.expand(parentNode);
+        }
+      }
+    }
+  }
 
   var nodes = [];
   for (var i = 0; i < cycle.modules.length; i++) {

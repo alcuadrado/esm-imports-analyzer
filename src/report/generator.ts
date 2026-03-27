@@ -49,6 +49,7 @@ export function generateReport(data: ReportData, outputPath: string): void {
   const nodeModulesDir = join(projectRoot, 'node_modules');
   const cytoscapeJS = readFileContent(join(nodeModulesDir, 'cytoscape', 'dist', 'cytoscape.min.js'));
   const coseBilkentJS = readFileContent(join(nodeModulesDir, 'cytoscape-cose-bilkent', 'cytoscape-cose-bilkent.js'));
+  const expandCollapseJS = readFileContent(join(nodeModulesDir, 'cytoscape-expand-collapse', 'cytoscape-expand-collapse.js'));
 
   // Assemble HTML
   let html = template;
@@ -56,6 +57,7 @@ export function generateReport(data: ReportData, outputPath: string): void {
   html = html.replace('{{DATA}}', JSON.stringify(data));
   html = html.replace('{{CYTOSCAPE_JS}}', `<script>${cytoscapeJS}</script>`);
   html = html.replace('{{CYTOSCAPE_COSE_BILKENT_JS}}', `<script>${coseBilkentJS}</script>`);
+  html = html.replace('{{CYTOSCAPE_EXPAND_COLLAPSE_JS}}', `<script>${expandCollapseJS}</script>`);
   html = html.replace('{{GRAPH_JS}}', graphJS);
   html = html.replace('{{TABLE_JS}}', tableJS);
   html = html.replace('{{CYCLES_PANEL_JS}}', cyclesPanelJS);
