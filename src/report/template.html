@@ -19,6 +19,7 @@
     </div>
     <div class="header-controls">
       <div class="filter-group">
+        <button class="relayout-btn" id="collapse-all-btn">Collapse all</button>
         <button class="relayout-btn" id="relayout-btn">Re-layout</button>
       </div>
       <div class="filter-group">
@@ -102,6 +103,12 @@
       var tableApi = initTable(data, cy);
       initCyclesPanel(data, cy);
       initFilters(cy, tableApi);
+
+      // Collapse all button
+      document.getElementById('collapse-all-btn').addEventListener('click', function () {
+        collapseAll(cy);
+        runLayout(cy);
+      });
 
       // Re-layout button
       document.getElementById('relayout-btn').addEventListener('click', function () {
