@@ -936,30 +936,47 @@ function zoomToNode(cy, resolvedURL) {
   }
 }
 
+// Search: highlight matching nodes in the graph. If a match is inside a
+// collapsed group or folder, highlight that collapsed ancestor instead.
 function filterBySearch(cy, query) {
   if (!query) {
-    cy.nodes('.module, .folder').forEach(function (node) {
-      if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
-      // Don't show nodes inside unexpanded folders
-      var fid = parentFolderOf[node.id()];
-      if (fid && !expandedFolders.has(fid)) return;
-      node.show();
-    });
+    cy.nodes().unselect();
+    clearSelectionHighlight(cy);
     return;
   }
+
   var lowerQuery = query.toLowerCase();
+  var toSelect = new Set();
+
+  // Check every module node (visible or not)
   cy.nodes('.module').forEach(function (node) {
-    if (node.parent().length > 0 && collapsedGroups.has(node.parent().id())) return;
-    var fid = parentFolderOf[node.id()];
-    if (fid && !expandedFolders.has(fid)) return;
     var label = (node.data('label') || '').toLowerCase();
     var path = (node.data('fullPath') || '').toLowerCase();
     if (label.indexOf(lowerQuery) !== -1 || path.indexOf(lowerQuery) !== -1) {
-      node.show();
-    } else {
-      node.hide();
+      // Resolve to the nearest visible ancestor
+      toSelect.add(resolveVisibleNode(cy, node.id()));
     }
   });
+
+  // Also check folder nodes by label
+  cy.nodes('.folder').forEach(function (node) {
+    var label = (node.data('label') || '').toLowerCase();
+    if (label.indexOf(lowerQuery) !== -1) {
+      if (node.visible()) {
+        toSelect.add(node.id());
+      } else {
+        toSelect.add(resolveVisibleNode(cy, node.id()));
+      }
+    }
+  });
+
+  // Select all matching visible nodes
+  cy.nodes().unselect();
+  toSelect.forEach(function (nodeId) {
+    var node = cy.getElementById(nodeId);
+    if (node.length > 0 && node.visible()) node.select();
+  });
+  applySelectionHighlight(cy);
 }
 
 

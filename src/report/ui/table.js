@@ -33,6 +33,7 @@ function initTable(data, cy) {
     var row = document.createElement('div');
     row.className = 'table-row';
     row.dataset.url = node.resolvedURL;
+    row.dataset.depth = depth;
 
     var hasChildren = node.children.length > 0;
     var indent = depth * 20;
@@ -152,15 +153,18 @@ function initTable(data, cy) {
 
   return {
     filter: function (query) {
-      var rows = tableBody.querySelectorAll('.table-row');
+      // Only filter top-level rows (depth 0), not expanded children
+      var rows = tableBody.querySelectorAll('.table-row[data-depth="0"]');
       var lowerQuery = query.toLowerCase();
       for (var i = 0; i < rows.length; i++) {
         var url = (rows[i].dataset.url || '').toLowerCase();
         var text = rows[i].textContent.toLowerCase();
-        if (!query || url.indexOf(lowerQuery) !== -1 || text.indexOf(lowerQuery) !== -1) {
-          rows[i].style.display = '';
-        } else {
-          rows[i].style.display = 'none';
+        var match = !query || url.indexOf(lowerQuery) !== -1 || text.indexOf(lowerQuery) !== -1;
+        // Hide/show the row and its sibling child-container
+        rows[i].style.display = match ? '' : 'none';
+        var next = rows[i].nextElementSibling;
+        if (next && next.classList.contains('child-container')) {
+          next.style.display = match ? next.style.display : 'none';
         }
       }
     },
