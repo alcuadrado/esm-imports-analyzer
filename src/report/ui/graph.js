@@ -1,19 +1,116 @@
 /* global cytoscape, document */
 
-var LAYOUT_OPTIONS = {
-  name: 'dagre',
-  rankDir: 'TB',
-  nodeSep: 40,
-  edgeSep: 10,
-  rankSep: 60,
-  animate: true,
-  animationDuration: 300,
-  fit: true,
-  padding: 30,
-};
+// Web Worker source that runs dagre layout off the main thread.
+// It loads dagre via importScripts and computes node positions.
+var DAGRE_WORKER_SRC = [
+  'importScripts("https://unpkg.com/dagre@0.7.4/dist/dagre.js");',
+  '',
+  'self.onmessage = function (e) {',
+  '  var msg = e.data;',
+  '  var g = new dagre.graphlib.Graph({ compound: true, multigraph: true });',
+  '  g.setGraph({',
+  '    rankdir: msg.rankDir || "TB",',
+  '    nodesep: msg.nodeSep || 40,',
+  '    edgesep: msg.edgeSep || 10,',
+  '    ranksep: msg.rankSep || 60,',
+  '  });',
+  '  g.setDefaultEdgeLabel(function () { return {}; });',
+  '',
+  '  for (var i = 0; i < msg.nodes.length; i++) {',
+  '    var n = msg.nodes[i];',
+  '    g.setNode(n.id, { width: n.width, height: n.height, label: n.id });',
+  '    if (n.parent) g.setParent(n.id, n.parent);',
+  '  }',
+  '  for (var j = 0; j < msg.edges.length; j++) {',
+  '    var ed = msg.edges[j];',
+  '    g.setEdge(ed.source, ed.target, {}, ed.id);',
+  '  }',
+  '',
+  '  dagre.layout(g);',
+  '',
+  '  var positions = {};',
+  '  g.nodes().forEach(function (id) {',
+  '    var nd = g.node(id);',
+  '    if (nd) positions[id] = { x: nd.x, y: nd.y };',
+  '  });',
+  '  self.postMessage(positions);',
+  '};',
+].join('\n');
 
-function runLayout(cy) {
-  cy.layout(LAYOUT_OPTIONS).run();
+var layoutOverlay = null;
+
+function showOverlay() {
+  if (!layoutOverlay) layoutOverlay = document.getElementById('layout-overlay');
+  if (layoutOverlay) layoutOverlay.classList.remove('hidden');
+}
+
+function hideOverlay() {
+  if (!layoutOverlay) layoutOverlay = document.getElementById('layout-overlay');
+  if (layoutOverlay) layoutOverlay.classList.add('hidden');
+}
+
+function runLayout(cy, callback) {
+  showOverlay();
+
+  // Extract graph data for the worker
+  var nodes = [];
+  var edges = [];
+
+  cy.nodes(':visible').forEach(function (node) {
+    nodes.push({
+      id: node.id(),
+      width: node.outerWidth() || 60,
+      height: node.outerHeight() || 40,
+      parent: node.parent().length > 0 ? node.parent().id() : null,
+    });
+  });
+
+  cy.edges(':visible').forEach(function (edge) {
+    edges.push({
+      id: edge.id(),
+      source: edge.source().id(),
+      target: edge.target().id(),
+    });
+  });
+
+  var blob = new Blob([DAGRE_WORKER_SRC], { type: 'application/javascript' });
+  var url = URL.createObjectURL(blob);
+  var worker = new Worker(url);
+
+  worker.onmessage = function (e) {
+    var positions = e.data;
+
+    // Apply positions to cytoscape without animation first, then fit
+    cy.batch(function () {
+      cy.nodes().forEach(function (node) {
+        var pos = positions[node.id()];
+        if (pos) node.position(pos);
+      });
+    });
+
+    cy.fit(undefined, 30);
+    hideOverlay();
+    worker.terminate();
+    URL.revokeObjectURL(url);
+    if (callback) callback();
+  };
+
+  worker.onerror = function () {
+    // Fallback: run preset layout (nodes stay where they are) and hide overlay
+    hideOverlay();
+    worker.terminate();
+    URL.revokeObjectURL(url);
+    if (callback) callback();
+  };
+
+  worker.postMessage({
+    nodes: nodes,
+    edges: edges,
+    rankDir: 'TB',
+    nodeSep: 40,
+    edgeSep: 10,
+    rankSep: 60,
+  });
 }
 
 function initGraph(data) {
@@ -54,28 +151,11 @@ function initGraph(data) {
     }
   }
 
-  // Count inter-group edges
-  var groupEdgeCounts = {};
-  for (var ei = 0; ei < data.modules.length; ei++) {
-    var em = data.modules[ei];
-    if (em.parentURL) {
-      var srcGroup = groupMap.get(em.parentURL);
-      var tgtGroup = groupMap.get(em.resolvedURL);
-      if (srcGroup && tgtGroup && srcGroup.id !== tgtGroup.id) {
-        var sgid = 'group-' + srcGroup.id;
-        var tgid = 'group-' + tgtGroup.id;
-        groupEdgeCounts[sgid] = (groupEdgeCounts[sgid] || 0) + 1;
-        groupEdgeCounts[tgid] = (groupEdgeCounts[tgid] || 0) + 1;
-      }
-    }
-  }
-
   // Add group (compound) nodes
   for (var gni = 0; gni < data.groups.length; gni++) {
     var grp = data.groups[gni];
     var groupNodeId = 'group-' + grp.id;
     var groupTime = (groupTotalTimes[groupNodeId] || 0).toFixed(1);
-    var edgeCount = groupEdgeCounts[groupNodeId] || 0;
     elements.push({
       group: 'nodes',
       data: {
@@ -85,7 +165,6 @@ function initGraph(data) {
         groupId: grp.id,
         moduleCount: grp.modules.length,
         groupTotalTime: groupTotalTimes[groupNodeId] || 0,
-        groupEdgeCount: edgeCount,
       },
       classes: grp.isNodeModules ? 'group node-modules' : 'group',
     });
@@ -149,6 +228,7 @@ function initGraph(data) {
     }
   }
 
+  // Create cytoscape with no layout initially — we'll run dagre in a worker
   var cy = cytoscape({
     container: container,
     elements: elements,
@@ -189,7 +269,6 @@ function initGraph(data) {
           'height': function (ele) { return Math.max(16, Math.min(48, 16 + (ele.data('totalTime') / (maxTime || 1)) * 32)); },
           'background-color': function (ele) {
             var ratio = ele.data('timeRatio') || 0;
-            // green -> yellow -> red
             var r = Math.round(ratio < 0.5 ? 166 + ratio * 2 * 87 : 243);
             var g = Math.round(ratio < 0.5 ? 227 : 227 - (ratio - 0.5) * 2 * 87);
             var b = Math.round(ratio < 0.5 ? 161 - ratio * 2 * 50 : 111 - (ratio - 0.5) * 2 * 50);
@@ -273,10 +352,17 @@ function initGraph(data) {
         },
       },
     ],
-    layout: LAYOUT_OPTIONS,
+    // Start with preset (no-op) layout; dagre runs async in worker
+    layout: { name: 'preset' },
     minZoom: 0.05,
     maxZoom: 5,
   });
+
+  // Hide builtins before layout so they don't affect positioning
+  cy.nodes('.builtin').hide();
+
+  // Run initial layout in worker
+  runLayout(cy);
 
   // Tooltip handling
   cy.on('mouseover', 'node.module', function (e) {
@@ -329,9 +415,6 @@ function initGraph(data) {
     }
   });
 
-  // Hide builtins by default
-  cy.nodes('.builtin').hide();
-
   function escapeHtml(str) {
     var div = document.createElement('div');
     div.textContent = str;
@@ -360,7 +443,6 @@ function highlightCycle(cy, cycle) {
     }
   }
 
-  // Zoom to fit the cycle
   if (nodes.length > 0) {
     var collection = cy.collection();
     for (var j = 0; j < nodes.length; j++) {

@@ -49,6 +49,12 @@
       <div class="graph-container">
         <div id="cy"></div>
         <div class="graph-tooltip" id="graph-tooltip"></div>
+        <div class="layout-overlay" id="layout-overlay">
+          <div class="layout-overlay-content">
+            <div class="layout-spinner"></div>
+            <div>Computing layout...</div>
+          </div>
+        </div>
       </div>
       <div class="resize-handle" id="resize-handle"></div>
       <div class="table-container" id="table-container">
@@ -67,11 +73,6 @@
   </script>
 
   <script src="https://unpkg.com/cytoscape@3.31.0/dist/cytoscape.min.js"></script>
-  <script src="https://unpkg.com/dagre@0.7.4/dist/dagre.js"></script>
-  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-  <script>
-    if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
-  </script>
 
   <script>
     {{GRAPH_JS}}
