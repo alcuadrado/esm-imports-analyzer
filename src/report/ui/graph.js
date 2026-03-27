@@ -651,8 +651,10 @@ function initGraph(data) {
           'text-halign': 'center',
           'border-width': 2,
           'border-color': '#585b70',
-          'width': 'label',
-          'padding': '20px',
+          'width': function (ele) {
+            var label = ele.data('label') || '';
+            return Math.max(80, label.length * 6.5 + 24);
+          },
         },
       },
       {
