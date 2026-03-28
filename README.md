@@ -58,23 +58,23 @@ The generated report is a single HTML file with:
 
 ### Graph interactions
 
-| Action | Effect |
-|--------|--------|
-| Click a node | Select it. Highlights outgoing imports (blue), incoming importers (green), and cycle edges (yellow). Everything else dims. |
-| Shift-click | Toggle a node in/out of the selection without affecting other selected nodes. |
-| Double-click a package | Expand or collapse it. |
-| Double-click a folder | Expand it (show its children inside the package). |
-| Double-click a module | Zoom into it. |
-| Double-click empty space | Zoom to fit the entire graph. |
-| Right-click any node | Context menu: expand importer/imported files, copy absolute path, copy full import chain from root. |
-| Hover a module | Tooltip with full path and import time. |
+| Action                   | Effect                                                                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Click a node             | Select it. Highlights outgoing imports (blue), incoming importers (green), and cycle edges (yellow). Everything else dims. |
+| Shift-click              | Toggle a node in/out of the selection without affecting other selected nodes.                                              |
+| Double-click a package   | Expand or collapse it.                                                                                                     |
+| Double-click a folder    | Expand it (show its children inside the package).                                                                          |
+| Double-click a module    | Zoom into it.                                                                                                              |
+| Double-click empty space | Zoom to fit the entire graph.                                                                                              |
+| Right-click any node     | Context menu: expand importer/imported files, copy absolute path, copy full import chain from root.                        |
+| Hover a module           | Tooltip with full path and import time.                                                                                    |
 
 ### Other UI elements
 
 - **Cycles panel** (left sidebar) — lists all circular dependencies. Click one to reveal and highlight its members with orange.
 - **Table** (bottom, resizable) — shows the slowest modules. Click a row to focus on it in the graph. Sortable by import time, import count, or name.
 - **Expand all / Collapse all** — buttons in the header.
-- **Auto re-layout** — checkbox (default: on). When enabled, the graph layout recomputes automatically after every expand/collapse. Disable it to manually control when layout runs via the Re-layout button.
+- **Auto re-layout** — checkbox (default: on). When enabled, the graph layout recomputes automatically after every expand/collapse. Disable it to manually control when layout runs via the Re-layout button. Useful for very large graphs where automatic layout can be slow.
 
 ## How it works
 
@@ -84,11 +84,11 @@ The generated report is a single HTML file with:
 
    ```js
    // Your module's source
-   import { foo } from './bar.js';
+   import { foo } from "./bar.js";
    doSomething();
 
    // Injected at the end:
-   ;globalThis.__esm_analyzer_import_done__("<module-url>");
+   globalThis.__esm_analyzer_import_done__("<module-url>");
    ```
 
 3. When the module finishes evaluating — after all its static dependencies have been resolved, loaded, and evaluated, and its own top-level code has run — the injected callback fires and records the elapsed time since the resolve hook started. This gives the **total import time**: the full wall-clock cost of importing that module, including everything it triggers.
