@@ -209,7 +209,7 @@ function refreshEdgeVisibility(cy) {
           id: 'meta-' + keys[i],
           source: me.source,
           target: me.target,
-          specifier: me.count + ' imports',
+          specifier: me.count + (me.count === 1 ? ' import' : ' imports'),
         },
         classes: 'meta-edge',
       });
