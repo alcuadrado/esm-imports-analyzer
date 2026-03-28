@@ -24,6 +24,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "rm -rf dist && tsc && cp -r src/report/ui dist/report/ui && cp src/report/template.html dist/report/template.html",
+    "pretest": "bash scripts/pretest.sh",
     "test": "node --test test/**/*.test.ts",
     "test:unit": "node --test test/unit/**/*.test.ts",
     "test:integration": "node --test test/integration/**/*.test.ts",
