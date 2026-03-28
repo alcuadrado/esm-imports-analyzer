@@ -29,7 +29,7 @@ The `--` separator is required. Everything after it is the command to analyze.
 npx esm-imports-analyzer -- node --test test/run-all.js
 
 # Analyze a CLI tool
-npx esm-imports-analyzer -- node_modules/.bin/hardhat compile
+npx esm-imports-analyzer -- node_modules/.bin/tool compile
 
 # Custom output path
 npx esm-imports-analyzer -o report.html -- node app.js
