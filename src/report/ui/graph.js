@@ -776,7 +776,6 @@ function initGraph(data) {
         style: {
           'background-color': '#45475a',
           'color': '#6c7086',
-          'border-style': 'dashed',
         },
       },
       {
