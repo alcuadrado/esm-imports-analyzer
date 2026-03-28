@@ -882,6 +882,17 @@ function initGraph(data) {
       }
     } else if (node.hasClass('folder')) {
       expandFolder(cy, node.id());
+    } else if (node.hasClass('module')) {
+      var selected = cy.nodes(':selected');
+      if (selected.length > 0 && !node.selected()) {
+        cy.nodes().unselect();
+        node.select();
+        applySelectionHighlight(cy);
+      } else if (selected.length === 0) {
+        node.select();
+        applySelectionHighlight(cy);
+      }
+      cy.animate({ center: { eles: node }, zoom: 1.5, duration: 300 });
     }
   });
 
