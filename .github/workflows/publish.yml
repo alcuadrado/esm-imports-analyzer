@@ -48,6 +48,9 @@ jobs:
 
       - name: Update demo branch
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           REPORT="examples/tests/esm-imports-report.html"
           TMPDIR=$(mktemp -d)
           cp "$REPORT" "$TMPDIR/index.html"
