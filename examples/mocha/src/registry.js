@@ -1,4 +1,4 @@
-// Circular dependency: registry <-> plugin
+// Circular dependency: registry -> plugin -> registry
 import { createPlugin } from './plugin.js';
 
 const plugins = new Map();

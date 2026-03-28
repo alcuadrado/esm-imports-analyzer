@@ -1,11 +1,15 @@
-// ESM module — formats durations and messages
+// ESM module — formats durations and messages using ms + chalk
 import ms from 'ms';
-import { colorize } from './colorize.js';
+import chalk from 'chalk';
 
 export function formatDuration(milliseconds) {
-  return colorize(ms(milliseconds), 'green');
+  return chalk.green(ms(milliseconds));
 }
 
 export function formatError(message) {
-  return colorize(message, 'red');
+  return chalk.red(message);
+}
+
+export function formatWarning(message) {
+  return chalk.yellow(message);
 }

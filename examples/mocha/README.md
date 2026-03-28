@@ -1,10 +1,13 @@
-# Mocha Example
+# Example Project
 
-A small ESM project with mocha tests that exercises:
+A small ESM project using `node:test` that exercises different import patterns:
 
-- ESM imports (`lodash-es`, `chalk`, `ms`)
-- CJS imports (`legacy.cjs` using `require()`)
-- Circular dependencies (`registry.js` <-> `plugin.js`)
+- **ESM packages**: `lodash-es`, `chalk`, `ms`
+- **CJS packages imported from ESM**: `semver`, `debug`
+- **Local CJS module**: `legacy.cjs` loaded via `createRequire`
+- **Circular dependencies**: `registry.js` <-> `plugin.js`
+- **Top-level await**: `config.js` reads `package.json` at import time
+- **Node builtins**: `node:fs/promises`, `node:path`, `node:url`
 
 ## Setup
 
