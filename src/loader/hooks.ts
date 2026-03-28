@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { ImportRecord } from '../types.ts';
 import type { RegisterHooksOptions, ResolveHookContext, LoadHookContext } from 'node:module';
 
@@ -70,12 +72,20 @@ export function createHooks(records: ImportRecord[], evalStarts: Map<string, num
 
       // Inject eval callback into JS module sources
       // format is 'module' for ESM, 'commonjs' for CJS via import(), undefined for CJS via require()
-      if (result.source != null && result.format !== 'json' && result.format !== 'wasm') {
-        const source = typeof result.source === 'string'
-          ? result.source
-          : new TextDecoder().decode(result.source);
+      if (result.format !== 'json' && result.format !== 'wasm') {
+        let source: string | null = null;
+        if (result.source != null) {
+          source = typeof result.source === 'string'
+            ? result.source
+            : new TextDecoder().decode(result.source);
+        } else if (url.startsWith('file://')) {
+          // CJS modules loaded via import() may have null source — read from disk
+          try { source = readFileSync(fileURLToPath(url), 'utf-8'); } catch {}
+        }
 
-        return { ...result, source: injectCallback(source, url) };
+        if (source !== null) {
+          return { ...result, source: injectCallback(source, url) };
+        }
       }
 
       // Non-JS module (JSON, WASM, builtin) — can't measure eval time
