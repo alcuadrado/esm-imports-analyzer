@@ -871,6 +871,7 @@ function initGraph(data) {
 
   // Double-click: expand/collapse groups, expand folders
   cy.on('dbltap', 'node', function (e) {
+    if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
     var node = e.target;
     if (node.hasClass('group')) {
       if (node.data('moduleCount') <= 1) return;
@@ -921,14 +922,19 @@ function initGraph(data) {
   });
 
   // Single click selects (with shift/meta for multi-select)
+  var tapTimer = null;
   cy.on('tap', 'node', function (e) {
     clearSearch();
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
-    if (!additive) cy.nodes().unselect();
-    node.select();
-    applySelectionHighlight(cy);
+    if (tapTimer) clearTimeout(tapTimer);
+    tapTimer = setTimeout(function () {
+      tapTimer = null;
+      if (!additive) cy.nodes().unselect();
+      node.select();
+      applySelectionHighlight(cy);
+    }, 200);
   });
 
   cy.on('tap', function (e) {
