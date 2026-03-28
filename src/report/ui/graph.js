@@ -865,10 +865,6 @@ function initGraph(data) {
     pixelRatio: 'auto',
   });
 
-  // Prevent Cytoscape from auto-selecting nodes on click.
-  // We handle all selection programmatically in our tap/dbltap handlers.
-  cy.nodes().unselectify();
-
   // Collapse all groups then run initial layout
   collapseAll(cy);
   runLayout(cy);
@@ -877,6 +873,10 @@ function initGraph(data) {
   cy.on('dbltap', 'node', function (e) {
     if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
     var node = e.target;
+
+    // Selection is already restored to pre-tap state by the tap handler.
+    // Use the saved pre-tap selection for our logic.
+    var savedIds = preTapSelectedIds || [];
 
     if (node.hasClass('group')) {
       if (node.data('moduleCount') <= 1) return;
@@ -888,18 +888,18 @@ function initGraph(data) {
     } else if (node.hasClass('folder')) {
       expandFolder(cy, node.id());
     } else if (node.hasClass('module')) {
-      var selected = cy.nodes(':selected');
-      if (selected.length > 0 && !node.selected()) {
-        // Node not in current selection — replace selection
+      var wasInSelection = savedIds.indexOf(node.id()) !== -1;
+      if (!wasInSelection && savedIds.length > 0) {
+        // Node not in previous selection — replace selection
         cy.nodes().unselect();
         node.select();
         applySelectionHighlight(cy);
-      } else if (selected.length === 0) {
-        // Nothing selected — select this node
+      } else if (savedIds.length === 0) {
+        // Nothing was selected — select this node
         node.select();
         applySelectionHighlight(cy);
       }
-      // If node is already selected (possibly among others), just zoom
+      // If node was in selection, selection is already correct — just zoom
       cy.animate({ center: { eles: node }, zoom: 1.2, duration: 300 });
     }
   });
@@ -929,16 +929,33 @@ function initGraph(data) {
     tooltip.style.display = 'none';
   });
 
-  // Single click selects (delayed to distinguish from double-click).
-  // Cytoscape auto-selection is disabled via unselectify() — we handle it all here.
+  // Single click selects (delayed 200ms to distinguish from double-click).
+  // On tap, we immediately undo Cytoscape's auto-selection, then apply our
+  // own logic after the delay. On dbltap, the timer is cancelled so selection
+  // remains exactly as it was before the double-click.
   var tapTimer = null;
+  var preTapSelectedIds = null;
+
+  cy.on('tapstart', 'node', function () {
+    // Save selection before Cytoscape's auto-select changes it
+    preTapSelectedIds = cy.nodes(':selected').toArray().map(function (n) { return n.id(); });
+  });
 
   cy.on('tap', 'node', function (e) {
     clearSearch();
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
-    var wasSelected = node.selected();
+    var wasSelected = preTapSelectedIds && preTapSelectedIds.indexOf(node.id()) !== -1;
+
+    // Immediately undo Cytoscape's auto-selection — restore pre-tap state
+    cy.nodes().unselect();
+    if (preTapSelectedIds) {
+      for (var ri = 0; ri < preTapSelectedIds.length; ri++) {
+        cy.getElementById(preTapSelectedIds[ri]).select();
+      }
+    }
+
     if (tapTimer) clearTimeout(tapTimer);
     tapTimer = setTimeout(function () {
       tapTimer = null;
