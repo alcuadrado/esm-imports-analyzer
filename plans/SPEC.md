@@ -1359,7 +1359,7 @@ esm-imports-analyzer -- node app.js
 esm-imports-analyzer -- node --test test/**/*.test.js
 
 # Analyze a CLI tool (avoid npx/pnpm after --)
-esm-imports-analyzer -- node_modules/.bin/tool compile
+esm-imports-analyzer -- node_modules/.bin/tool
 ```
 
 **Important:** Avoid using `npx`, `pnpm`, `bunx`, etc. after `--`. They are Node.js processes themselves and will be measured. Use `node_modules/.bin/<tool>` or `node <script>` directly.
