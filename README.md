@@ -4,7 +4,7 @@ A CLI tool that captures all ESM imports during a Node.js application's executio
 
 ![ESM Imports Analyzer](screenshot.png)
 
-[Live demo](TODO)
+[Live demo](https://patriciopalladino.com/esm-imports-analyzer/)
 
 ## Usage
 
