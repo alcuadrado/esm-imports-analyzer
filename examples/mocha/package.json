@@ -1,0 +1,19 @@
+{
+  "name": "mocha-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "mocha",
+    "analyze": "esm-imports-analyzer -- npx mocha"
+  },
+  "devDependencies": {
+    "mocha": "^11.0.0",
+    "esm-imports-analyzer": "file:../.."
+  },
+  "dependencies": {
+    "lodash-es": "^4.17.21",
+    "ms": "^2.1.3",
+    "chalk": "^5.4.1"
+  }
+}
