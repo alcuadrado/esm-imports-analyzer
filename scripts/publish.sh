@@ -17,6 +17,10 @@ fi
 
 echo "==> Publishing esm-imports-analyzer $TAG"
 
+# 0. Installing dependencies
+echo "==> Installing dependencies..."
+pnpm install
+
 # 1. Run the tests
 echo "==> Running tests..."
 pnpm test
