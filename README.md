@@ -66,7 +66,7 @@ The generated report is a single HTML file with:
 | Double-click a folder    | Expand it (show its children inside the package).                                                                          |
 | Double-click a module    | Zoom into it.                                                                                                              |
 | Double-click empty space | Zoom to fit the entire graph.                                                                                              |
-| Right-click any node     | Context menu: expand importer/imported files, copy absolute path, copy full import chain from root.                        |
+| Right-click any node     | Context menu: expand importer/imported files, copy absolute path, copy full import chain from roots seen during execution  |
 | Hover a module           | Tooltip with full path and import time.                                                                                    |
 
 ### Other UI elements
