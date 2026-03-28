@@ -119,4 +119,26 @@ describe('loader integration', () => {
     }
     // It's also acceptable to have no record at all if the process died before flushing
   });
+
+  it('records totalImportTime for CJS modules imported via ESM import', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'node-modules/a.js'));
+    const msRecord = result.records.find(r => r.resolvedURL.includes('node_modules') && r.resolvedURL.includes('ms'));
+    assert.ok(msRecord, 'Should capture ms package import');
+    assert.ok(typeof msRecord.totalImportTime === 'number', 'CJS module via import should have totalImportTime');
+    assert.ok(msRecord.totalImportTime! >= 0, 'totalImportTime should be non-negative');
+  });
+
+  it('records totalImportTime for CJS modules loaded via require()', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'cjs-require/a.cjs'));
+    const aURL = pathToFileURL(resolve(fixturesDir, 'cjs-require/a.cjs')).href;
+    const bURL = pathToFileURL(resolve(fixturesDir, 'cjs-require/b.cjs')).href;
+
+    const aRecord = result.records.find(r => r.resolvedURL === aURL);
+    assert.ok(aRecord, 'Should capture a.cjs');
+    assert.ok(typeof aRecord.totalImportTime === 'number', 'CJS module via require should have totalImportTime');
+
+    const bRecord = result.records.find(r => r.resolvedURL === bURL);
+    assert.ok(bRecord, 'Should capture b.cjs');
+    assert.ok(typeof bRecord.totalImportTime === 'number', 'CJS child module via require should have totalImportTime');
+  });
 });
