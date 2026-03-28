@@ -1,6 +1,6 @@
 {
   "name": "esm-imports-analyzer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A tool to generate an HTML visualization of the imports of an ESM Node.js application. It executes the application, tracks the imports during runtime, and creates the visualization after the execution is complete.",
   "keywords": [
     "node",
