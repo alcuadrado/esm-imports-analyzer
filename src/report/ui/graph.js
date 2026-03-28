@@ -928,11 +928,16 @@ function initGraph(data) {
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
+    var wasSelected = node.selected();
     if (tapTimer) clearTimeout(tapTimer);
     tapTimer = setTimeout(function () {
       tapTimer = null;
-      if (!additive) cy.nodes().unselect();
-      node.select();
+      if (additive) {
+        if (wasSelected) { node.unselect(); } else { node.select(); }
+      } else {
+        cy.nodes().unselect();
+        node.select();
+      }
       applySelectionHighlight(cy);
     }, 200);
   });
