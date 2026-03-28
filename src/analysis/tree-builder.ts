@@ -17,7 +17,7 @@ export function buildTree(records: ImportRecord[]): ModuleNode[] {
     nodeByURL.set(url, {
       resolvedURL: url,
       specifier: record.specifier,
-      totalTime: (record.resolveEndTime - record.resolveStartTime) + (record.loadEndTime - record.loadStartTime),
+      totalTime: record.totalImportTime ?? 0,
       children: [],
       parentURL: record.parentURL,
     });
@@ -29,7 +29,7 @@ export function buildTree(records: ImportRecord[]): ModuleNode[] {
   const sortedNodes = [...nodeByURL.values()].sort((a, b) => {
     const aRec = recordByURL.get(a.resolvedURL)!;
     const bRec = recordByURL.get(b.resolvedURL)!;
-    return aRec.loadStartTime - bRec.loadStartTime;
+    return aRec.importStartTime - bRec.importStartTime;
   });
 
   for (const node of sortedNodes) {

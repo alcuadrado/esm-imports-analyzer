@@ -10,10 +10,7 @@ function makeRecord(resolvedURL: string, parent?: string): ImportRecord {
     specifier: resolvedURL,
     resolvedURL,
     parentURL: parent ?? null,
-    resolveStartTime: 0,
-    resolveEndTime: 1,
-    loadStartTime: 1,
-    loadEndTime: 2,
+    importStartTime: 0,
   };
 }
 

@@ -6,10 +6,7 @@ import type { ImportRecord } from '../../src/types.ts';
 function makeRecord(overrides: Partial<ImportRecord> & Pick<ImportRecord, 'resolvedURL' | 'specifier'>): ImportRecord {
   return {
     parentURL: null,
-    resolveStartTime: 0,
-    resolveEndTime: 1,
-    loadStartTime: 1,
-    loadEndTime: 2,
+    importStartTime: 0,
     ...overrides,
   };
 }
@@ -32,9 +29,9 @@ describe('buildTree', () => {
 
   it('builds a linear chain A -> B -> C', () => {
     const records = [
-      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', resolveStartTime: 0, loadEndTime: 30 }),
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 5, loadStartTime: 6, loadEndTime: 20 }),
-      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///b.js', resolveStartTime: 10, loadStartTime: 11, loadEndTime: 15 }),
+      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', importStartTime: 0, totalImportTime: 30 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', importStartTime: 5, totalImportTime: 15 }),
+      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///b.js', importStartTime: 10, totalImportTime: 5 }),
     ];
     const tree = buildTree(records);
     assert.equal(tree.length, 1);
@@ -48,8 +45,8 @@ describe('buildTree', () => {
   it('builds branching: A -> B, A -> C', () => {
     const records = [
       makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js' }),
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', loadStartTime: 2 }),
-      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///a.js', loadStartTime: 3 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', importStartTime: 2 }),
+      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///a.js', importStartTime: 3 }),
     ];
     const tree = buildTree(records);
     assert.equal(tree.length, 1);
@@ -67,12 +64,12 @@ describe('buildTree', () => {
 
   it('handles diamond dependency (DAG)', () => {
     const records = [
-      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', resolveStartTime: 0, loadEndTime: 50 }),
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 5, loadStartTime: 6, loadEndTime: 30 }),
-      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///a.js', resolveStartTime: 31, loadStartTime: 32, loadEndTime: 45 }),
-      makeRecord({ resolvedURL: 'file:///d.js', specifier: './d.js', parentURL: 'file:///b.js', resolveStartTime: 10, loadStartTime: 11, loadEndTime: 20 }),
+      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', importStartTime: 0, totalImportTime: 50 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', importStartTime: 5, totalImportTime: 25 }),
+      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///a.js', importStartTime: 31, totalImportTime: 14 }),
+      makeRecord({ resolvedURL: 'file:///d.js', specifier: './d.js', parentURL: 'file:///b.js', importStartTime: 10, totalImportTime: 10 }),
       // D imported again by C — this is a duplicate, first occurrence wins
-      makeRecord({ resolvedURL: 'file:///d.js', specifier: './d.js', parentURL: 'file:///c.js', resolveStartTime: 35, loadStartTime: 36, loadEndTime: 36 }),
+      makeRecord({ resolvedURL: 'file:///d.js', specifier: './d.js', parentURL: 'file:///c.js', importStartTime: 35 }),
     ];
     const tree = buildTree(records);
     assert.equal(tree.length, 1);
@@ -85,17 +82,17 @@ describe('buildTree', () => {
 
   it('computes totalTime correctly', () => {
     const records = [
-      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', resolveStartTime: 10, loadEndTime: 50 }),
+      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', totalImportTime: 40 }),
     ];
     const tree = buildTree(records);
     assert.equal(tree[0]!.totalTime, 40);
   });
 
-  it('orders children by load start time', () => {
+  it('orders children by import start time', () => {
     const records = [
       makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js' }),
-      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///a.js', loadStartTime: 10 }),
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', loadStartTime: 5 }),
+      makeRecord({ resolvedURL: 'file:///c.js', specifier: './c.js', parentURL: 'file:///a.js', importStartTime: 10 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', importStartTime: 5 }),
     ];
     const tree = buildTree(records);
     assert.equal(tree[0]!.children[0]!.resolvedURL, 'file:///b.js');
@@ -104,15 +101,15 @@ describe('buildTree', () => {
 
   it('handles duplicate imports (cached) — first occurrence wins', () => {
     const records = [
-      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', resolveStartTime: 0, loadEndTime: 100 }),
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 5, resolveEndTime: 6, loadStartTime: 6, loadEndTime: 50 }),
-      // Same module imported again (cached, near-zero timing)
-      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', resolveStartTime: 60, loadStartTime: 60, loadEndTime: 60.1 }),
+      makeRecord({ resolvedURL: 'file:///a.js', specifier: './a.js', importStartTime: 0, totalImportTime: 100 }),
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', importStartTime: 5, totalImportTime: 45 }),
+      // Same module imported again (cached, no totalImportTime)
+      makeRecord({ resolvedURL: 'file:///b.js', specifier: './b.js', parentURL: 'file:///a.js', importStartTime: 60 }),
     ];
     const tree = buildTree(records);
     // b should appear once under a with real timing from first import
     assert.equal(tree[0]!.children.length, 1);
-    assert.equal(tree[0]!.children[0]!.totalTime, 45); // 50 - 5
+    assert.equal(tree[0]!.children[0]!.totalTime, 45);
   });
 
   it('handles single module (entry point only)', () => {

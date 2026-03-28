@@ -54,7 +54,7 @@ test/
 ## Data Flow
 
 1. **CLI** parses args, creates temp file path, sets `NODE_OPTIONS=--import=<register.ts>` and `ESM_ANALYZER_TEMP_FILE`, spawns user's command
-2. **Loader** (`register.ts`) calls `module.registerHooks()` (in-thread, Node 24). Hooks record resolve+load timing for every import. On process exit, writes `ImportRecord[]` JSON to temp file
+2. **Loader** (`register.ts`) calls `module.registerHooks()` (in-thread, Node 24). Hooks record `importStartTime` for every import and inject `__esm_analyzer_import_done__` callback into JS module sources to measure inclusive import time. On process exit, merges eval times into records and writes `ImportRecord[]` JSON to temp file
 3. **CLI** reads temp file, runs analysis pipeline:
    - `buildTree()` -> import tree
    - `detectCycles()` -> circular dependencies (Tarjan's SCC)
@@ -72,16 +72,15 @@ interface ImportRecord {
   specifier: string;        // Raw import specifier
   resolvedURL: string;      // Fully resolved file:// URL
   parentURL: string | null; // Module that imported this one
-  resolveStartTime: number; // performance.now() timestamps
-  resolveEndTime: number;
-  loadStartTime: number;
-  loadEndTime: number;
+  importStartTime: number;  // performance.now() when resolve hook fires
+  totalImportTime?: number; // Wall-clock from importStartTime to eval-complete
+                            // undefined for builtins, JSON, WASM, cached/circular modules
 }
 
 interface ModuleNode {
   resolvedURL: string;
   specifier: string;
-  totalTime: number;        // (resolveEnd - resolveStart) + (loadEnd - loadStart)
+  totalTime: number;        // totalImportTime ?? 0
   children: ModuleNode[];
   parentURL: string | null;
 }
@@ -118,21 +117,23 @@ interface ReportData {
 
 ## Timing Model
 
-All timing uses **self-time**, not wall-clock span:
+Uses **inclusive wall-clock "Import time"** measured via source injection:
 
-- **Module self-time**: `(resolveEndTime - resolveStartTime) + (loadEndTime - loadStartTime)` — actual time spent resolving + loading this module, excluding time spent on other modules loaded in between
-- **Resolve time**: time spent locating the module on disk (filesystem lookups, package.json exports resolution)
-- **Load time**: time spent reading and parsing the module source from disk
-- **Total execution time** (metadata): `max(loadEndTime) - min(resolveStartTime)` across all records — the full wall-clock span of all module loading
-- **Neither captures execution time** — the time a module's top-level code takes to run is not instrumented
+- **Import time** (`totalImportTime`): wall-clock from when the resolve hook fires to when the module's evaluation completes. Includes resolve + load + parse + recursive dependency resolution/evaluation + own top-level code execution + top-level await suspension
+- **Total execution time** (metadata): `max(importStartTime + totalImportTime) - min(importStartTime)` across records with `totalImportTime`
+- **Measurement method**: the load hook appends `globalThis.__esm_analyzer_import_done__(url)` to JS module sources. A callback computes elapsed time from the resolve hook's start timestamp
+- **Unavailable for**: builtins (`node:`), JSON, WASM, cached/circular re-imports — these have `totalImportTime: undefined`
+- **Known limitations**: modules that throw during evaluation won't record import time; `__esm_analyzer_import_done__` name collision is theoretically possible
 
 ---
 
 ## Loader Hooks (`src/loader/hooks.ts`)
 
 - Uses `module.registerHooks()` (Node 24 in-thread API)
-- `resolve` hook: records timing. If module already loaded (cached/circular), emits record immediately with near-zero load time. Otherwise queues a pending resolve
-- `load` hook: matches pending resolve by URL, emits complete record
+- `resolve` hook: records `importStartTime`. If module already loaded (cached/circular), emits record immediately (no `totalImportTime`). Otherwise queues a pending resolve
+- `load` hook: matches pending resolve by URL, stores `importStartTime` in `evalStarts` map, emits record. For JS modules (`format === 'module'` or `'commonjs'` with non-null source), appends `globalThis.__esm_analyzer_import_done__(url)` to module source. For non-JS modules, deletes from `evalStarts`
+- Source map preservation: injected code inserted before any trailing `//# sourceMappingURL` comment
+- `register.ts` defines the `__esm_analyzer_import_done__` callback which computes `totalImportTime = performance.now() - importStartTime`. On process exit, merges eval times into records before flushing to temp file
 - Captures circular dependency back-edges (the resolve fires but load doesn't for cached modules)
 
 ---
@@ -141,9 +142,9 @@ All timing uses **self-time**, not wall-clock span:
 
 ### Tree Builder (`src/analysis/tree-builder.ts`)
 - First occurrence of each URL wins (subsequent cached imports ignored)
-- Children ordered by `loadStartTime`
+- Children ordered by `importStartTime`
 - Orphaned nodes (parent not found) become roots
-- totalTime = self-time (resolve + load)
+- totalTime = `totalImportTime ?? 0`
 
 ### Cycle Detector (`src/analysis/cycle-detector.ts`)
 - Tarjan's SCC algorithm
@@ -167,8 +168,8 @@ All timing uses **self-time**, not wall-clock span:
 - Skips non-`file://` URLs
 
 ### Timing (`src/analysis/timing.ts`)
-- `computeRankedList()`: unique modules sorted by self-time descending
-- `computeTotalTime(records)`: `max(loadEndTime) - min(resolveStartTime)` — full execution span
+- `computeRankedList()`: unique modules sorted by `totalImportTime` descending (undefined treated as 0)
+- `computeTotalTime(records)`: `max(importStartTime + totalImportTime) - min(importStartTime)` — full execution span (only records with `totalImportTime` contribute to max)
 
 ---
 
@@ -268,15 +269,13 @@ All timing uses **self-time**, not wall-clock span:
 
 **Title row:** "Slowest modules" on the left, "Count: [input]" on the right (default 20).
 
-**Columns:** Module | Total Time | Resolve | Load | Imports — all always visible.
+**Columns:** Module | Import time | Imports — all always visible.
 - Each column header has a ⓘ tooltip icon explaining the metric
-- All time columns right-aligned, monospace font
+- Time column right-aligned, monospace font. Shows em-dash (—) for modules without `totalImportTime`
 - No colored bars — just plain numbers
 
 **Sort = filter:** Sorting by any column changes which N modules are shown as root rows:
-- Sort by Total Time -> N slowest by self-time
-- Sort by Resolve -> N slowest by resolve time
-- Sort by Load -> N slowest by load time
+- Sort by Import time -> N slowest by `totalImportTime`
 - Sort by Imports -> N with most recursive imports
 - Sort by Module -> N slowest by time (default set), alphabetically sorted
 
@@ -358,16 +357,16 @@ Options:
 
 | Suite | Tests | What |
 |-------|-------|------|
-| unit/tree-builder | 10 | Tree building, dedup, ordering, diamond DAG, self-time |
+| unit/tree-builder | 10 | Tree building, dedup, ordering, diamond DAG, import time |
 | unit/cycle-detector | 9 | Tarjan's SCC, self-refs, overlapping, performance |
 | unit/grouper | 10 | Package grouping, builtins, monorepo, scoped, ungrouped, nested pkg.json |
-| unit/timing | 8 | Ranking, dedup, stable sort, zero-time, execution span |
+| unit/timing | 8 | Ranking, dedup, stable sort, no-time modules, execution span |
 | unit/folder-tree | 11 | Flatten logic, single-child chains, mixed, IDs |
-| integration/loader | 8 | Hook capture for all fixture types |
+| integration/loader | 12 | Hook capture, import time measurement, TLA timing, builtins, throwing modules |
 | integration/report | 8 | HTML structure, embedded data, CDN, CSS |
 | integration/cli | 12 | Args, flags, NODE_OPTIONS, exit codes |
 | performance | 2 | 1000 and 5000 module benchmarks |
-| **Total** | **78** | |
+| **Total** | **82** | |
 
 Run all: `node --test test/unit/*.test.ts test/integration/*.test.ts test/performance/*.test.ts`
 
@@ -377,8 +376,10 @@ Run all: `node --test test/unit/*.test.ts test/integration/*.test.ts test/perfor
 
 | Decision | Choice | Why |
 |----------|--------|-----|
-| Timing model | Self-time (resolve + load) | Wall-clock span was misleading — included unrelated work |
-| Total time | max(loadEnd) - min(resolveStart) | True execution span, not max root time |
+| Timing model | Inclusive wall-clock "Import time" via source injection | Measures real-world import cost including dependencies and evaluation |
+| Total time | max(importStart + totalImportTime) - min(importStart) | True execution span from records with measurable import time |
+| Eval measurement | Inject `__esm_analyzer_import_done__` callback into module source | Only way to detect when module evaluation completes without Node API |
+| Source map preservation | Insert injected code before `//# sourceMappingURL` | Keeps source maps functional |
 | Layout algorithm | Dagre (hierarchical DAG) | Clear top-to-bottom flow for dependency trees |
 | Layout execution | Web Worker | Avoids blocking main thread |
 | Layout spacing | nodeSep:60 edgeSep:20 rankSep:80 | Prevents package node overlap |

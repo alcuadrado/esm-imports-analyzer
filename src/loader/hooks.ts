@@ -5,40 +5,42 @@ interface PendingResolve {
   specifier: string;
   resolvedURL: string;
   parentURL: string | null;
-  resolveStartTime: number;
-  resolveEndTime: number;
+  importStartTime: number;
 }
 
-export function createHooks(records: ImportRecord[]): RegisterHooksOptions {
+const SOURCE_MAP_RE = /(\n\/\/[#@] sourceMappingURL=[^\n]*\s*)$/;
+
+function injectCallback(source: string, url: string): string {
+  const injection = `\n;globalThis.__esm_analyzer_import_done__(${JSON.stringify(url)});\n`;
+  if (SOURCE_MAP_RE.test(source)) {
+    return source.replace(SOURCE_MAP_RE, injection + '$1');
+  }
+  return source + injection;
+}
+
+export function createHooks(records: ImportRecord[], evalStarts: Map<string, number>): RegisterHooksOptions {
   const loadedURLs = new Set<string>();
-  // Queue of resolve results awaiting their load call
   const pendingQueue: PendingResolve[] = [];
 
   return {
     resolve(specifier: string, context: ResolveHookContext, nextResolve) {
-      const resolveStartTime = performance.now();
+      const importStartTime = performance.now();
       const result = nextResolve(specifier, context);
-      const resolveEndTime = performance.now();
 
       if (loadedURLs.has(result.url)) {
         // Already loaded (cached import or circular back-edge).
-        // Record immediately with near-zero load time.
         records.push({
           specifier,
           resolvedURL: result.url,
           parentURL: context.parentURL ?? null,
-          resolveStartTime,
-          resolveEndTime,
-          loadStartTime: resolveEndTime,
-          loadEndTime: resolveEndTime,
+          importStartTime,
         });
       } else {
         pendingQueue.push({
           specifier,
           resolvedURL: result.url,
           parentURL: context.parentURL ?? null,
-          resolveStartTime,
-          resolveEndTime,
+          importStartTime,
         });
       }
 
@@ -46,9 +48,7 @@ export function createHooks(records: ImportRecord[]): RegisterHooksOptions {
     },
 
     load(url: string, context: LoadHookContext, nextLoad) {
-      const loadStartTime = performance.now();
       const result = nextLoad(url, context);
-      const loadEndTime = performance.now();
 
       loadedURLs.add(url);
 
@@ -57,17 +57,29 @@ export function createHooks(records: ImportRecord[]): RegisterHooksOptions {
       if (idx !== -1) {
         const pending = pendingQueue[idx]!;
         pendingQueue.splice(idx, 1);
+
+        evalStarts.set(url, pending.importStartTime);
+
         records.push({
           specifier: pending.specifier,
           resolvedURL: url,
           parentURL: pending.parentURL,
-          resolveStartTime: pending.resolveStartTime,
-          resolveEndTime: pending.resolveEndTime,
-          loadStartTime,
-          loadEndTime,
+          importStartTime: pending.importStartTime,
         });
       }
 
+      // Inject eval callback into JS module sources
+      // format is 'module' for ESM, 'commonjs' for CJS via import(), undefined for CJS via require()
+      if (result.source != null && result.format !== 'json' && result.format !== 'wasm') {
+        const source = typeof result.source === 'string'
+          ? result.source
+          : new TextDecoder().decode(result.source);
+
+        return { ...result, source: injectCallback(source, url) };
+      }
+
+      // Non-JS module (JSON, WASM, builtin) — can't measure eval time
+      evalStarts.delete(url);
       return result;
     },
   };

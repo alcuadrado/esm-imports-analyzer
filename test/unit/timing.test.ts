@@ -3,15 +3,13 @@ import assert from 'node:assert/strict';
 import { computeRankedList, computeTotalTime } from '../../src/analysis/timing.ts';
 import type { ImportRecord } from '../../src/types.ts';
 
-function makeRecord(url: string, resolveStart: number, loadEnd: number, parent?: string): ImportRecord {
+function makeRecord(url: string, importStart: number, totalImportTime?: number, parent?: string): ImportRecord {
   return {
     specifier: url,
     resolvedURL: url,
     parentURL: parent ?? null,
-    resolveStartTime: resolveStart,
-    resolveEndTime: resolveStart + 1,
-    loadStartTime: resolveStart + 1,
-    loadEndTime: loadEnd,
+    importStartTime: importStart,
+    totalImportTime,
   };
 }
 
@@ -28,8 +26,8 @@ describe('computeRankedList', () => {
     assert.equal(ranked[2]!.resolvedURL, 'a');
   });
 
-  it('computes totalTime as self-time (resolve + load)', () => {
-    const records = [makeRecord('a', 10, 50)];
+  it('computes totalTime from totalImportTime', () => {
+    const records = [makeRecord('a', 10, 40)];
     const ranked = computeRankedList(records);
     assert.equal(ranked[0]!.totalTime, 40);
   });
@@ -43,7 +41,7 @@ describe('computeRankedList', () => {
   it('deduplicates by resolvedURL (first occurrence wins)', () => {
     const records = [
       makeRecord('a', 0, 100),
-      makeRecord('a', 200, 201), // cached, near-zero
+      makeRecord('a', 200), // cached, no totalImportTime
     ];
     const ranked = computeRankedList(records);
     assert.equal(ranked.length, 1);
@@ -62,10 +60,10 @@ describe('computeRankedList', () => {
     assert.equal(ranked[2]!.resolvedURL, 'c');
   });
 
-  it('zero-time modules (cached) rank last', () => {
+  it('modules without totalImportTime rank last', () => {
     const records = [
       makeRecord('a', 0, 50),
-      makeRecord('b', 0, 0), // zero time (cached)
+      makeRecord('b', 0), // no import time (cached/builtin)
       makeRecord('c', 0, 30),
     ];
     const ranked = computeRankedList(records);
@@ -78,9 +76,9 @@ describe('computeTotalTime', () => {
   it('returns total execution span', () => {
     const records = [
       makeRecord('a', 0, 100),
-      makeRecord('b', 10, 80),
+      makeRecord('b', 10, 70),
     ];
-    assert.equal(computeTotalTime(records), 100); // max(loadEnd) - min(resolveStart) = 100 - 0
+    assert.equal(computeTotalTime(records), 100); // max(0+100, 10+70) - min(0, 10) = 100 - 0
   });
 
   it('returns 0 for empty records', () => {

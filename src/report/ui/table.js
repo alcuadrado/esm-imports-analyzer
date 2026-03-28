@@ -20,9 +20,7 @@ function initTable(data, cy) {
     var m = data.modules[i];
     if (!timingByURL[m.resolvedURL]) {
       timingByURL[m.resolvedURL] = {
-        totalTime: (m.resolveEndTime - m.resolveStartTime) + (m.loadEndTime - m.loadStartTime),
-        resolveTime: m.resolveEndTime - m.resolveStartTime,
-        loadTime: m.loadEndTime - m.loadStartTime,
+        totalImportTime: m.totalImportTime || 0,
       };
     }
   }
@@ -40,9 +38,7 @@ function initTable(data, cy) {
 
   function getMetric(node, column) {
     var t = timingByURL[node.resolvedURL];
-    if (column === 'time') return t ? t.totalTime : node.totalTime;
-    if (column === 'resolve') return t ? t.resolveTime : 0;
-    if (column === 'load') return t ? t.loadTime : 0;
+    if (column === 'time') return t ? t.totalImportTime : node.totalTime;
     if (column === 'imports') return countAllChildren(node);
     return 0;
   }
@@ -78,16 +74,15 @@ function initTable(data, cy) {
     var hasChildren = node.children.length > 0;
     var indent = depth * 20;
     var childCount = countAllChildren(node);
-    var t = timingByURL[node.resolvedURL] || { totalTime: node.totalTime, resolveTime: 0, loadTime: 0 };
+    var t = timingByURL[node.resolvedURL] || { totalImportTime: node.totalTime };
+    var timeDisplay = t.totalImportTime ? t.totalImportTime.toFixed(2) + ' ms' : '\u2014';
 
     row.innerHTML =
       '<div class="module-name" style="padding-left: ' + indent + 'px">' +
         '<span class="chevron' + (hasChildren ? '' : ' empty') + '">' + (hasChildren ? '\u25B6' : '') + '</span>' +
         '<span class="module-label" title="' + escapeAttr(node.resolvedURL) + '">' + escapeHtml(depth === 0 ? getDisplayPath(node.resolvedURL) : node.specifier) + '</span>' +
       '</div>' +
-      '<div class="time-value">' + t.totalTime.toFixed(2) + ' ms</div>' +
-      '<div class="time-value">' + t.resolveTime.toFixed(2) + ' ms</div>' +
-      '<div class="time-value">' + t.loadTime.toFixed(2) + ' ms</div>' +
+      '<div class="time-value">' + timeDisplay + '</div>' +
       '<div class="imports-count">' + childCount + '</div>';
 
     parentElement.appendChild(row);

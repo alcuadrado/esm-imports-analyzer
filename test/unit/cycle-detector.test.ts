@@ -8,10 +8,7 @@ function makeRecord(resolved: string, parent: string | null, specifier?: string)
     specifier: specifier ?? resolved,
     resolvedURL: resolved,
     parentURL: parent,
-    resolveStartTime: 0,
-    resolveEndTime: 1,
-    loadStartTime: 1,
-    loadEndTime: 2,
+    importStartTime: 0,
   };
 }
 

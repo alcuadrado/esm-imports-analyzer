@@ -32,7 +32,6 @@
     <div class="cycles-panel" id="cycles-panel">
       <div class="cycles-header">
         <h2>Circular Dependencies</h2>
-        <button class="cycles-toggle" id="cycles-toggle">&lsaquo;</button>
       </div>
       <div class="cycles-list" id="cycles-list"></div>
       <button class="clear-highlight-btn" id="clear-highlight-btn">Clear highlight</button>
@@ -57,9 +56,7 @@
         </div>
         <div class="table-header-row">
           <span class="col-module" data-sort="name">Module <span class="sort-arrow"></span></span>
-          <span class="col-time" data-sort="time">Total Time <span class="header-info-icon" title="Time spent resolving + loading this module">&#9432;</span> <span class="sort-arrow">&#9660;</span></span>
-          <span class="col-resolve" data-sort="resolve">Resolve <span class="header-info-icon" title="Time spent locating the module on disk (filesystem lookups, package.json exports resolution)">&#9432;</span> <span class="sort-arrow"></span></span>
-          <span class="col-load" data-sort="load">Load <span class="header-info-icon" title="Time spent reading and parsing the module source from disk">&#9432;</span> <span class="sort-arrow"></span></span>
+          <span class="col-time" data-sort="time">Import time <span class="header-info-icon" title="Total time to fully import this module, including resolution, loading, parsing, dependencies, and top-level code execution">&#9432;</span> <span class="sort-arrow">&#9660;</span></span>
           <span class="col-imports" data-sort="imports">Imports <span class="header-info-icon" title="Total number of modules imported by this module (recursively)">&#9432;</span> <span class="sort-arrow"></span></span>
         </div>
         <div class="table-body" id="table-body"></div>
@@ -103,11 +100,11 @@
       // Expand/Collapse all buttons
       document.getElementById('expand-all-btn').addEventListener('click', function () {
         expandAll(cy);
-        runLayout(cy);
+        maybeRelayoutWithCallback(cy);
       });
       document.getElementById('collapse-all-btn').addEventListener('click', function () {
         collapseAll(cy);
-        runLayout(cy);
+        maybeRelayoutWithCallback(cy);
       });
 
       // Re-layout button

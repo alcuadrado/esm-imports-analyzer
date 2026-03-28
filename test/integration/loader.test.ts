@@ -57,12 +57,11 @@ describe('loader integration', () => {
     assert.ok(builtinUrls.includes('node:path'), `Expected node:path in builtins, got: ${builtinUrls.join(', ')}`);
   });
 
-  it('records timing data with positive values', () => {
+  it('records timing data with valid values', () => {
     const result = runWithLoader(resolve(fixturesDir, 'simple/a.js'));
     for (const record of result.records) {
-      assert.ok(record.resolveEndTime >= record.resolveStartTime, 'resolveEndTime should be >= resolveStartTime');
-      assert.ok(record.loadEndTime >= record.loadStartTime, 'loadEndTime should be >= loadStartTime');
-      assert.ok(record.loadEndTime >= record.resolveStartTime, 'loadEndTime should be >= resolveStartTime');
+      assert.ok(typeof record.importStartTime === 'number', 'importStartTime should be a number');
+      assert.ok(record.importStartTime >= 0, 'importStartTime should be non-negative');
     }
   });
 
@@ -79,10 +78,45 @@ describe('loader integration', () => {
     for (const record of result.records) {
       assert.ok(typeof record.specifier === 'string');
       assert.ok(typeof record.resolvedURL === 'string');
-      assert.ok(typeof record.resolveStartTime === 'number');
-      assert.ok(typeof record.resolveEndTime === 'number');
-      assert.ok(typeof record.loadStartTime === 'number');
-      assert.ok(typeof record.loadEndTime === 'number');
+      assert.ok(typeof record.importStartTime === 'number');
     }
+  });
+
+  it('records totalImportTime for JS modules', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'simple/a.js'));
+    const aURL = pathToFileURL(resolve(fixturesDir, 'simple/a.js')).href;
+    const aRecord = result.records.find(r => r.resolvedURL === aURL);
+    assert.ok(aRecord);
+    assert.ok(typeof aRecord.totalImportTime === 'number', 'totalImportTime should be a number for JS modules');
+    assert.ok(aRecord.totalImportTime! >= 0, 'totalImportTime should be non-negative');
+  });
+
+  it('records totalImportTime >= 90ms for slow fixture with top-level await', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'slow/a.js'));
+    const aURL = pathToFileURL(resolve(fixturesDir, 'slow/a.js')).href;
+    const aRecord = result.records.find(r => r.resolvedURL === aURL);
+    assert.ok(aRecord);
+    assert.ok(aRecord.totalImportTime !== undefined, 'totalImportTime should be defined');
+    assert.ok(aRecord.totalImportTime! >= 90, `totalImportTime should be >= 90ms, got ${aRecord.totalImportTime}`);
+  });
+
+  it('builtin modules have no totalImportTime', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'builtins/a.js'));
+    const builtins = result.records.filter(r => r.resolvedURL.startsWith('node:'));
+    for (const b of builtins) {
+      assert.equal(b.totalImportTime, undefined, `builtin ${b.resolvedURL} should not have totalImportTime`);
+    }
+  });
+
+  it('modules that throw during evaluation have no totalImportTime', () => {
+    const result = runWithLoader(resolve(fixturesDir, 'throwing/a.js'));
+    // The process will fail, but we should still get records
+    const bURL = pathToFileURL(resolve(fixturesDir, 'throwing/b.js')).href;
+    const bRecord = result.records.find(r => r.resolvedURL === bURL);
+    if (bRecord) {
+      assert.equal(bRecord.totalImportTime, undefined,
+        'Module that throws should not have totalImportTime');
+    }
+    // It's also acceptable to have no record at all if the process died before flushing
   });
 });

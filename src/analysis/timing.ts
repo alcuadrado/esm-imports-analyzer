@@ -17,7 +17,7 @@ export function computeRankedList(records: ImportRecord[]): TimingEntry[] {
       entries.push({
         resolvedURL: record.resolvedURL,
         specifier: record.specifier,
-        totalTime: (record.resolveEndTime - record.resolveStartTime) + (record.loadEndTime - record.loadStartTime),
+        totalTime: record.totalImportTime ?? 0,
       });
     }
   }
@@ -33,8 +33,12 @@ export function computeTotalTime(records: ImportRecord[]): number {
   let minStart = Infinity;
   let maxEnd = -Infinity;
   for (const record of records) {
-    if (record.resolveStartTime < minStart) minStart = record.resolveStartTime;
-    if (record.loadEndTime > maxEnd) maxEnd = record.loadEndTime;
+    if (record.importStartTime < minStart) minStart = record.importStartTime;
+    if (record.totalImportTime !== undefined) {
+      const end = record.importStartTime + record.totalImportTime;
+      if (end > maxEnd) maxEnd = end;
+    }
   }
+  if (maxEnd === -Infinity) return 0;
   return maxEnd - minStart;
 }

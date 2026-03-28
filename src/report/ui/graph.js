@@ -137,7 +137,15 @@ function runLayout(cy, callback) {
 }
 
 function maybeRelayout(cy) {
-  if (autoRelayout) runLayout(cy);
+  if (autoRelayout && !suppressAutoSelect) runLayout(cy);
+}
+
+function maybeRelayoutWithCallback(cy, callback) {
+  if (autoRelayout) {
+    runLayout(cy, callback);
+  } else if (callback) {
+    callback();
+  }
 }
 
 // Resolve a module URL to its nearest visible ancestor node ID.
@@ -560,6 +568,66 @@ function initGraph(data) {
     if (data.groups[gli].folderTree) collectFileLabels(data.groups[gli].folderTree);
   }
 
+  // Build parent lookup from recorded data (first occurrence per URL)
+  var parentByURL = {};
+  for (var pbi = 0; pbi < data.modules.length; pbi++) {
+    var pm = data.modules[pbi];
+    if (!(pm.resolvedURL in parentByURL)) {
+      parentByURL[pm.resolvedURL] = pm.parentURL || null;
+    }
+  }
+
+  function getImportPath(moduleURL) {
+    var chain = [moduleURL];
+    var current = moduleURL;
+    var visited = {};
+    visited[current] = true;
+    while (parentByURL[current]) {
+      current = parentByURL[current];
+      if (visited[current]) break; // avoid infinite loop on cycles
+      visited[current] = true;
+      chain.push(current);
+    }
+    chain.reverse();
+    return chain.map(function (u) {
+      return u.startsWith('file://') ? u.slice(7) : u;
+    }).join(' -> ');
+  }
+
+  function getModuleURLsForNode(node) {
+    var urls = [];
+    if (node.hasClass('module')) {
+      urls.push(node.id());
+    } else if (node.hasClass('group')) {
+      node.descendants('.module').forEach(function (m) { urls.push(m.id()); });
+      // Also include hidden modules from collapsed groups
+      var gid = node.data('groupId');
+      var grp = null;
+      for (var i = 0; i < data.groups.length; i++) {
+        if (data.groups[i].id === gid) { grp = data.groups[i]; break; }
+      }
+      if (grp) {
+        for (var j = 0; j < grp.modules.length; j++) {
+          if (urls.indexOf(grp.modules[j]) === -1) urls.push(grp.modules[j]);
+        }
+      }
+    } else if (node.hasClass('folder')) {
+      (function collectFolderModules(fid) {
+        var state = folderState[fid];
+        if (!state) return;
+        for (var i = 0; i < state.children.length; i++) {
+          var child = state.children[i];
+          if (child.type === 'file' && child.moduleURL) {
+            urls.push(child.moduleURL);
+          } else if (child.type === 'folder') {
+            collectFolderModules(child.id);
+          }
+        }
+      })(node.id());
+    }
+    return urls;
+  }
+
   // Track unique modules (first occurrence)
   var seenModules = new Set();
   for (var mni = 0; mni < data.modules.length; mni++) {
@@ -568,7 +636,7 @@ function initGraph(data) {
     seenModules.add(mod.resolvedURL);
 
     var modGroup = groupMap.get(mod.resolvedURL);
-    var totalTime = (mod.resolveEndTime - mod.resolveStartTime) + (mod.loadEndTime - mod.loadStartTime);
+    var totalTime = mod.totalImportTime || 0;
     var isBuiltin = mod.resolvedURL.startsWith('node:');
 
     // Use folder tree label if available
@@ -794,6 +862,8 @@ function initGraph(data) {
     layout: { name: 'preset' },
     minZoom: 0.05,
     maxZoom: 5,
+    textureOnViewport: false,
+    pixelRatio: 'auto',
   });
 
   // Collapse all groups then run initial layout
@@ -818,9 +888,10 @@ function initGraph(data) {
   // Tooltip handling
   cy.on('mouseover', 'node.module', function (e) {
     var d = e.target.data();
+    var timeStr = d.totalTime ? d.totalTime.toFixed(2) + ' ms' : '\u2014';
     tooltip.innerHTML =
       '<div class="tooltip-path">' + escapeHtml(d.fullPath) + '</div>' +
-      '<div class="tooltip-time">' + d.totalTime.toFixed(2) + ' ms</div>';
+      '<div class="tooltip-time">' + timeStr + '</div>';
     tooltip.style.display = 'block';
   });
 
@@ -901,30 +972,50 @@ function initGraph(data) {
     var pos = e.renderedPosition || e.position;
 
     ctxMenu.innerHTML = '';
-    var item = document.createElement('div');
-    item.className = 'graph-context-menu-item';
-    item.textContent = 'Copy absolute path';
-    item.addEventListener('click', function () {
+
+    function menuItem(label, tooltip, onclick) {
+      var el = document.createElement('div');
+      el.className = 'graph-context-menu-item';
+      el.innerHTML = escapeHtml(label) + ' <span class="menu-info-icon" title="' + escapeAttr(tooltip) + '">\u24D8</span>';
+      el.addEventListener('click', onclick);
+      ctxMenu.appendChild(el);
+    }
+
+    function copyToClipboard(text) {
       var ta = document.createElement('textarea');
-      ta.value = path;
+      ta.value = text;
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      hideContextMenu();
-    });
-    ctxMenu.appendChild(item);
+    }
 
-    var expandItem = document.createElement('div');
-    expandItem.className = 'graph-context-menu-item';
-    expandItem.textContent = 'Expand importers';
-    expandItem.addEventListener('click', function () {
+    menuItem('Expand importer files', 'Reveal all modules that import this node', function () {
       hideContextMenu();
       expandImporters(cy, node);
     });
-    ctxMenu.appendChild(expandItem);
+
+    menuItem('Expand imported files', 'Reveal all modules imported by this node', function () {
+      hideContextMenu();
+      expandImported(cy, node);
+    });
+
+    menuItem('Copy absolute path', 'Copy the filesystem path to clipboard', function () {
+      copyToClipboard(path);
+      hideContextMenu();
+    });
+
+    menuItem('Copy import paths', 'Copy the full import chain from root to each file in this node', function () {
+      var urls = getModuleURLsForNode(node);
+      var paths = [];
+      for (var i = 0; i < urls.length; i++) {
+        paths.push(getImportPath(urls[i]));
+      }
+      copyToClipboard(paths.join('\n\n'));
+      hideContextMenu();
+    });
 
     ctxMenu.style.left = pos.x + 'px';
     ctxMenu.style.top = pos.y + 'px';
@@ -938,6 +1029,10 @@ function initGraph(data) {
     var div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   return cy;
@@ -990,7 +1085,60 @@ function expandImporters(cy, node) {
   suppressAutoSelect = false;
 
   var nodeId = node.id();
-  runLayout(cy, function () {
+  maybeRelayoutWithCallback(cy, function () {
+    var n = cy.getElementById(nodeId);
+    cy.nodes().unselect();
+    n.select();
+    applySelectionHighlight(cy);
+  });
+}
+
+function expandImported(cy, node) {
+  // Collect all module URLs belonging to this node
+  var sourceURLs = new Set();
+  if (node.hasClass('module')) {
+    sourceURLs.add(node.id());
+  } else if (node.hasClass('group')) {
+    node.descendants('.module').forEach(function (m) { sourceURLs.add(m.id()); });
+  } else if (node.hasClass('folder')) {
+    function collectFolderModules(fid) {
+      var state = folderState[fid];
+      if (!state) return;
+      for (var i = 0; i < state.children.length; i++) {
+        var child = state.children[i];
+        if (child.type === 'file' && child.moduleURL) {
+          sourceURLs.add(child.moduleURL);
+        } else if (child.type === 'folder') {
+          collectFolderModules(child.id);
+        }
+      }
+    }
+    collectFolderModules(node.id());
+  }
+
+  // Find all imported module URLs (targets of edges from our modules)
+  var importedURLs = new Set();
+  cy.edges().forEach(function (edge) {
+    if (sourceURLs.has(edge.data('source'))) {
+      var tgt = edge.data('target');
+      if (!sourceURLs.has(tgt)) {
+        importedURLs.add(tgt);
+      }
+    }
+  });
+
+  if (importedURLs.size === 0) return;
+
+  // Reveal each imported module (minimal expansion)
+  suppressAutoSelect = true;
+  importedURLs.forEach(function (url) {
+    revealModule(cy, url);
+  });
+  refreshEdgeVisibility(cy);
+  suppressAutoSelect = false;
+
+  var nodeId = node.id();
+  maybeRelayoutWithCallback(cy, function () {
     var n = cy.getElementById(nodeId);
     cy.nodes().unselect();
     n.select();
@@ -1013,7 +1161,7 @@ function highlightCycle(cy, cycle) {
   refreshEdgeVisibility(cy);
   suppressAutoSelect = false;
 
-  runLayout(cy, function () {
+  maybeRelayoutWithCallback(cy, function () {
     // Apply cycle highlight after layout completes
     var nodes = [];
     for (var i = 0; i < cycle.modules.length; i++) {
@@ -1050,16 +1198,7 @@ function highlightCycle(cy, cycle) {
 }
 
 function clearHighlights(cy) {
-  cy.nodes().unselect();
-  clearSelectionHighlight(cy);
   cy.elements().removeClass('cycle-highlight');
-  suppressAutoSelect = true;
-  collapseAll(cy);
-  refreshEdgeVisibility(cy);
-  suppressAutoSelect = false;
-  runLayout(cy, function () {
-    cy.animate({ fit: { eles: cy.elements(), padding: 30 }, duration: 300 });
-  });
 }
 
 function zoomToNode(cy, resolvedURL) {
@@ -1093,7 +1232,7 @@ function focusOnNode(cy, resolvedURL) {
   revealModule(cy, resolvedURL);
   refreshEdgeVisibility(cy);
   suppressAutoSelect = false;
-  runLayout(cy, function () {
+  maybeRelayoutWithCallback(cy, function () {
     var n = cy.getElementById(resolvedURL);
     cy.nodes().unselect();
     n.select();

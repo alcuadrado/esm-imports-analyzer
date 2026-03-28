@@ -15,10 +15,8 @@ function generateRecords(count: number): ImportRecord[] {
     specifier: 'root',
     resolvedURL: 'file:///root.js',
     parentURL: null,
-    resolveStartTime: 0,
-    resolveEndTime: 0.01,
-    loadStartTime: 0.01,
-    loadEndTime: count * 0.1,
+    importStartTime: 0,
+    totalImportTime: count * 0.1,
   });
 
   let id = 1;
@@ -31,10 +29,8 @@ function generateRecords(count: number): ImportRecord[] {
         specifier: `./mod-${id}.js`,
         resolvedURL: url,
         parentURL,
-        resolveStartTime: startTime,
-        resolveEndTime: startTime + 0.005,
-        loadStartTime: startTime + 0.005,
-        loadEndTime: startTime + 0.05,
+        importStartTime: startTime,
+        totalImportTime: 0.05,
       });
       parentURL = url;
       id++;

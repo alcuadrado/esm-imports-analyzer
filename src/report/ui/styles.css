@@ -139,18 +139,11 @@ body {
   overflow: hidden;
 }
 
-.cycles-panel.collapsed {
-  width: 36px;
-  min-width: 36px;
-}
-
 .cycles-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
-  cursor: pointer;
 }
 
 .cycles-header h2 {
@@ -159,15 +152,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
-}
-
-.cycles-toggle {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px;
 }
 
 .cycles-list {
@@ -436,8 +420,6 @@ body {
 
 .col-module { flex: 1; }
 .col-time { width: 90px; text-align: right; justify-content: flex-end; font-family: var(--font-mono); }
-.col-resolve { width: 90px; text-align: right; justify-content: flex-end; font-family: var(--font-mono); }
-.col-load { width: 90px; text-align: right; justify-content: flex-end; font-family: var(--font-mono); }
 .col-imports { width: 80px; text-align: right; justify-content: flex-end; font-family: var(--font-mono); }
 
 .header-info-icon {
@@ -534,6 +516,13 @@ body {
 
 .graph-context-menu-item:hover {
   background: var(--border);
+}
+
+.graph-context-menu-item .menu-info-icon {
+  cursor: help;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-left: 6px;
 }
 
 /* Sort indicator */

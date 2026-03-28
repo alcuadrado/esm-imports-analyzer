@@ -2,10 +2,8 @@ export interface ImportRecord {
   specifier: string;
   resolvedURL: string;
   parentURL: string | null;
-  resolveStartTime: number;
-  resolveEndTime: number;
-  loadStartTime: number;
-  loadEndTime: number;
+  importStartTime: number;
+  totalImportTime?: number;
 }
 
 export interface ModuleNode {

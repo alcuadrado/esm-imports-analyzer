@@ -3,8 +3,6 @@
 function initCyclesPanel(data, cy) {
   var cyclesList = document.getElementById('cycles-list');
   var clearBtn = document.getElementById('clear-highlight-btn');
-  var panel = document.getElementById('cycles-panel');
-  var toggleBtn = document.getElementById('cycles-toggle');
   var activeItem = null;
 
   if (data.cycles.length === 0) {
@@ -72,10 +70,6 @@ function initCyclesPanel(data, cy) {
     if (activeItem) activeItem.classList.remove('active');
     activeItem = null;
     clearHighlights(cy);
-  });
-
-  toggleBtn.addEventListener('click', function () {
-    panel.classList.toggle('collapsed');
   });
 
   function escapeHtml(str) {
