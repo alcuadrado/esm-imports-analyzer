@@ -869,15 +869,9 @@ function initGraph(data) {
   collapseAll(cy);
   runLayout(cy);
 
-  // Double-click: expand/collapse groups, expand folders
+  // Double-click: expand/collapse groups, expand folders, zoom into modules
   cy.on('dbltap', 'node', function (e) {
-    if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
     var node = e.target;
-
-    // Selection is already restored to pre-tap state by the tap handler.
-    // Use the saved pre-tap selection for our logic.
-    var savedIds = preTapSelectedIds || [];
-
     if (node.hasClass('group')) {
       if (node.data('moduleCount') <= 1) return;
       if (collapsedGroups.has(node.id())) {
@@ -888,18 +882,6 @@ function initGraph(data) {
     } else if (node.hasClass('folder')) {
       expandFolder(cy, node.id());
     } else if (node.hasClass('module')) {
-      var wasInSelection = savedIds.indexOf(node.id()) !== -1;
-      if (!wasInSelection && savedIds.length > 0) {
-        // Node not in previous selection — replace selection
-        cy.nodes().unselect();
-        node.select();
-        applySelectionHighlight(cy);
-      } else if (savedIds.length === 0) {
-        // Nothing was selected — select this node
-        node.select();
-        applySelectionHighlight(cy);
-      }
-      // If node was in selection, selection is already correct — just zoom
       cy.animate({ center: { eles: node }, zoom: 1.2, duration: 300 });
     }
   });
@@ -929,44 +911,19 @@ function initGraph(data) {
     tooltip.style.display = 'none';
   });
 
-  // Single click selects (delayed 200ms to distinguish from double-click).
-  // On tap, we immediately undo Cytoscape's auto-selection, then apply our
-  // own logic after the delay. On dbltap, the timer is cancelled so selection
-  // remains exactly as it was before the double-click.
-  var tapTimer = null;
-  var preTapSelectedIds = null;
-
-  cy.on('tapstart', 'node', function () {
-    // Save selection before Cytoscape's auto-select changes it
-    preTapSelectedIds = cy.nodes(':selected').toArray().map(function (n) { return n.id(); });
-  });
-
+  // Single click selects. Shift/Ctrl/Cmd-click toggles.
   cy.on('tap', 'node', function (e) {
     clearSearch();
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
-    var wasSelected = preTapSelectedIds && preTapSelectedIds.indexOf(node.id()) !== -1;
-
-    // Immediately undo Cytoscape's auto-selection — restore pre-tap state
-    cy.nodes().unselect();
-    if (preTapSelectedIds) {
-      for (var ri = 0; ri < preTapSelectedIds.length; ri++) {
-        cy.getElementById(preTapSelectedIds[ri]).select();
-      }
+    if (additive) {
+      if (node.selected()) { node.unselect(); } else { node.select(); }
+    } else {
+      cy.nodes().unselect();
+      node.select();
     }
-
-    if (tapTimer) clearTimeout(tapTimer);
-    tapTimer = setTimeout(function () {
-      tapTimer = null;
-      if (additive) {
-        if (wasSelected) { node.unselect(); } else { node.select(); }
-      } else {
-        cy.nodes().unselect();
-        node.select();
-      }
-      applySelectionHighlight(cy);
-    }, 200);
+    applySelectionHighlight(cy);
   });
 
   cy.on('tap', function (e) {
