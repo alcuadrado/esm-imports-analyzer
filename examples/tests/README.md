@@ -8,6 +8,7 @@ A small ESM project using `node:test` that exercises different import patterns:
 - **Circular dependencies**: `registry.js` <-> `plugin.js`
 - **Top-level await**: `config.js` reads `package.json` at import time
 - **Node builtins**: `node:fs/promises`, `node:path`, `node:url`
+- **A huge dependency graph**: Importing `lodash-es` adds tons of modules to the graph, which shows how the analyzer can be performant as longs as you don't expand big parts of the graph.
 
 ## Setup
 
