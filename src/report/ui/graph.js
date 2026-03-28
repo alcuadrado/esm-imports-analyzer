@@ -871,6 +871,7 @@ function initGraph(data) {
 
   // Double-click: expand/collapse groups, expand folders, zoom into modules
   cy.on('dbltap', 'node', function (e) {
+    tapGeneration++; // invalidate pending tap selections
     var node = e.target;
     if (node.hasClass('group')) {
       if (node.data('moduleCount') <= 1) return;
@@ -919,28 +920,33 @@ function initGraph(data) {
   });
 
   // Single click selects. Shift/Ctrl/Cmd-click toggles.
+  // Deferred via setTimeout to run AFTER Cytoscape's own post-tap selection processing.
+  // Generation counter lets dbltap cancel pending tap selections.
+  var tapGeneration = 0;
   cy.on('tap', 'node', function (e) {
     clearSearch();
+    var gen = ++tapGeneration;
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
-    // Use pre-tap state for toggle (Cytoscape may have already auto-selected)
     var wasSelected = preTapSelectedIds[node.id()] === true;
+    var savedIds = preTapSelectedIds;
 
-    // Undo Cytoscape's auto-selection, restore pre-tap state
-    cy.nodes().unselect();
-    for (var id in preTapSelectedIds) {
-      cy.getElementById(id).select();
-    }
-
-    // Now apply our logic
-    if (additive) {
-      if (wasSelected) { node.unselect(); } else { node.select(); }
-    } else {
-      cy.nodes().unselect();
-      node.select();
-    }
-    applySelectionHighlight(cy);
+    setTimeout(function () {
+      if (gen !== tapGeneration) return; // cancelled by dbltap or newer tap
+      if (additive) {
+        // Restore pre-tap state, then toggle the clicked node
+        cy.nodes().unselect();
+        for (var id in savedIds) {
+          cy.getElementById(id).select();
+        }
+        if (wasSelected) { node.unselect(); } else { node.select(); }
+      } else {
+        cy.nodes().unselect();
+        node.select();
+      }
+      applySelectionHighlight(cy);
+    }, 0);
   });
 
   cy.on('tap', function (e) {
