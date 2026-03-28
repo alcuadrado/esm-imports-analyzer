@@ -88,10 +88,11 @@ function runLayout(cy, callback) {
     if (node.parent().length > 0 && expandedGroupIds.has(node.parent().id())) {
       parentId = node.parent().id();
     }
+    var bb = node.boundingBox({ includeLabels: true });
     nodes.push({
       id: node.id(),
-      width: node.outerWidth() || 60,
-      height: node.outerHeight() || 40,
+      width: bb.w || 60,
+      height: bb.h || 40,
       parent: parentId,
     });
   });
