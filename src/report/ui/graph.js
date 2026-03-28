@@ -911,14 +911,31 @@ function initGraph(data) {
     tooltip.style.display = 'none';
   });
 
+  // Save selection on mousedown (before Cytoscape auto-selects)
+  var preTapSelectedIds = {};
+  cy.on('tapstart', 'node', function () {
+    preTapSelectedIds = {};
+    cy.nodes(':selected').forEach(function (n) { preTapSelectedIds[n.id()] = true; });
+  });
+
   // Single click selects. Shift/Ctrl/Cmd-click toggles.
   cy.on('tap', 'node', function (e) {
     clearSearch();
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
+    // Use pre-tap state for toggle (Cytoscape may have already auto-selected)
+    var wasSelected = preTapSelectedIds[node.id()] === true;
+
+    // Undo Cytoscape's auto-selection, restore pre-tap state
+    cy.nodes().unselect();
+    for (var id in preTapSelectedIds) {
+      cy.getElementById(id).select();
+    }
+
+    // Now apply our logic
     if (additive) {
-      if (node.selected()) { node.unselect(); } else { node.select(); }
+      if (wasSelected) { node.unselect(); } else { node.select(); }
     } else {
       cy.nodes().unselect();
       node.select();
