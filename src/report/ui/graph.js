@@ -892,7 +892,7 @@ function initGraph(data) {
         node.select();
         applySelectionHighlight(cy);
       }
-      cy.animate({ center: { eles: node }, zoom: 1.5, duration: 300 });
+      cy.animate({ center: { eles: node }, zoom: 1.2, duration: 300 });
     }
   });
 
