@@ -871,7 +871,6 @@ function initGraph(data) {
 
   // Double-click: expand/collapse groups, expand folders, zoom into modules
   cy.on('dbltap', 'node', function (e) {
-    tapGeneration++; // invalidate pending tap selections
     var node = e.target;
     if (node.hasClass('group')) {
       if (node.data('moduleCount') <= 1) return;
@@ -921,11 +920,8 @@ function initGraph(data) {
 
   // Single click selects. Shift/Ctrl/Cmd-click toggles.
   // Deferred via setTimeout to run AFTER Cytoscape's own post-tap selection processing.
-  // Generation counter lets dbltap cancel pending tap selections.
-  var tapGeneration = 0;
   cy.on('tap', 'node', function (e) {
     clearSearch();
-    var gen = ++tapGeneration;
     var node = e.target;
     var originalEvent = e.originalEvent;
     var additive = originalEvent && (originalEvent.shiftKey || originalEvent.metaKey || originalEvent.ctrlKey);
@@ -933,7 +929,6 @@ function initGraph(data) {
     var savedIds = preTapSelectedIds;
 
     setTimeout(function () {
-      if (gen !== tapGeneration) return; // cancelled by dbltap or newer tap
       if (additive) {
         // Restore pre-tap state, then toggle the clicked node
         cy.nodes().unselect();
