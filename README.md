@@ -50,6 +50,7 @@ npx esm-imports-analyzer -o report.html -- node app.js
 The generated report is a single HTML file with:
 
 - **Dependency graph** — interactive visualization of all module imports, grouped by package
+- **Scalable to large graphs** — all packages start collapsed, showing only inter-package edges. Expand individual packages to reveal their modules and folder hierarchy, keeping the visible graph as simple or detailed as you need
 - **Import time** — wall-clock time to fully import each module (resolve + load + parse + dependencies + top-level execution)
 - **Circular dependency detection** — found via Tarjan's strongly connected components algorithm
 - **Package grouping** — modules grouped by `package.json` boundaries with collapsible folder hierarchy
