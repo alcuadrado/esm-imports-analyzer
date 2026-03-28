@@ -100,11 +100,11 @@
       // Expand/Collapse all buttons
       document.getElementById('expand-all-btn').addEventListener('click', function () {
         expandAll(cy);
-        maybeRelayoutWithCallback(cy);
+        maybeRelayoutWithCallback(cy, function () { applySelectionHighlight(cy); });
       });
       document.getElementById('collapse-all-btn').addEventListener('click', function () {
         collapseAll(cy);
-        maybeRelayoutWithCallback(cy);
+        maybeRelayoutWithCallback(cy, function () { applySelectionHighlight(cy); });
       });
 
       // Re-layout button
