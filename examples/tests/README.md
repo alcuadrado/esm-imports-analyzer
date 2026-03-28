@@ -11,7 +11,18 @@ A small ESM project using `node:test` that exercises different import patterns:
 
 ## Setup
 
+First, build the analyzer from the project root:
+
 ```bash
+cd ../..
+pnpm install
+pnpm build
+```
+
+Then install this example's dependencies:
+
+```bash
+cd examples/tests
 pnpm install
 ```
 
