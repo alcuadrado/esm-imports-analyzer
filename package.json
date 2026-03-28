@@ -10,6 +10,7 @@
     "optimization"
   ],
   "author": "Patricio Palladino <email@patriciopalladino.com>",
+  "repository": "github:alcuadrado/esm-imports-analyzer",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
