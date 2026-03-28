@@ -4,11 +4,13 @@ import assert from 'node:assert/strict';
 /**
  * These tests verify the selection logic used in graph.js for
  * single-click, shift-click, and double-click interactions.
- * The logic is extracted here as pure functions to test edge cases.
+ *
+ * Cytoscape auto-selection is disabled via unselectify(), so
+ * selection only changes through our handlers.
  */
 
 interface SelectionResult {
-  selected: string[];  // node IDs that should be selected after the action
+  selected: string[];
 }
 
 // Reproduces the single-click (tap) logic from graph.js
@@ -19,35 +21,34 @@ function singleClick(
 ): SelectionResult {
   const wasSelected = currentSelection.includes(clickedId);
   if (additive) {
-    // Shift/Ctrl/Cmd-click: toggle the clicked node
     if (wasSelected) {
       return { selected: currentSelection.filter(id => id !== clickedId) };
     } else {
       return { selected: [...currentSelection, clickedId] };
     }
   } else {
-    // Plain click: select only this node
     return { selected: [clickedId] };
   }
 }
 
-// Reproduces the double-click (dbltap) logic from graph.js for module nodes
+// Reproduces the double-click (dbltap) logic from graph.js for module nodes.
+// Since Cytoscape auto-selection is disabled, the selection at dbltap time
+// is exactly what it was before the double-click started.
 function doubleClickModule(
   clickedId: string,
-  preClickSelection: string[],
+  currentSelection: string[],
 ): SelectionResult {
-  // First: restore the selection from before the double-click started
-  const wasInSelection = preClickSelection.includes(clickedId);
+  const isSelected = currentSelection.includes(clickedId);
 
-  if (!wasInSelection && preClickSelection.length > 0) {
-    // Node not in previous selection — replace with just this node
+  if (currentSelection.length > 0 && !isSelected) {
+    // Node not in selection — replace with just this node
     return { selected: [clickedId] };
-  } else if (preClickSelection.length === 0) {
-    // Nothing was selected — select this node
+  } else if (currentSelection.length === 0) {
+    // Nothing selected — select this node
     return { selected: [clickedId] };
   } else {
-    // Node was in the selection — keep the full selection unchanged
-    return { selected: preClickSelection };
+    // Node is in the selection — keep full selection, just zoom
+    return { selected: currentSelection };
   }
 }
 
@@ -108,22 +109,31 @@ describe('double-click module selection', () => {
     const result = doubleClickModule('a', []);
     assert.deepEqual(result.selected, ['a']);
   });
+});
 
-  it('uses pre-click selection, not current (handles Cytoscape auto-select)', () => {
-    // Simulates: nodes a,b,c selected, user double-clicks d.
-    // Cytoscape auto-selects d on first click (changing current selection),
-    // but we saved [a,b,c] on tapstart. Double-click logic uses the saved state.
-    const preClickSelection = ['a', 'b', 'c'];
-    const result = doubleClickModule('d', preClickSelection);
-    assert.deepEqual(result.selected, ['d']);
+describe('single-click then double-click sequence', () => {
+  it('shift-click to build selection, then double-click member preserves all', () => {
+    // Click A, shift-click B, shift-click C, double-click B
+    let sel = singleClick('a', [], false).selected;          // ['a']
+    sel = singleClick('b', sel, true).selected;              // ['a', 'b']
+    sel = singleClick('c', sel, true).selected;              // ['a', 'b', 'c']
+    // Double-click fires — tap timer is cancelled, selection unchanged
+    const result = doubleClickModule('b', sel);
+    assert.deepEqual(result.selected, ['a', 'b', 'c']);
   });
 
-  it('preserves selection when double-clicking member of selection (Cytoscape auto-select scenario)', () => {
-    // Simulates: nodes a,b selected, user double-clicks b.
-    // Cytoscape auto-selects b on first click (unselecting a),
-    // but we saved [a,b] on tapstart. Double-click restores [a,b].
-    const preClickSelection = ['a', 'b'];
-    const result = doubleClickModule('b', preClickSelection);
-    assert.deepEqual(result.selected, ['a', 'b']);
+  it('shift-click to build selection, then double-click non-member replaces', () => {
+    let sel = singleClick('a', [], false).selected;          // ['a']
+    sel = singleClick('b', sel, true).selected;              // ['a', 'b']
+    const result = doubleClickModule('c', sel);
+    assert.deepEqual(result.selected, ['c']);
+  });
+
+  it('shift-click to toggle off, then double-click remaining', () => {
+    let sel = singleClick('a', [], false).selected;          // ['a']
+    sel = singleClick('b', sel, true).selected;              // ['a', 'b']
+    sel = singleClick('a', sel, true).selected;              // ['b'] (a toggled off)
+    const result = doubleClickModule('b', sel);
+    assert.deepEqual(result.selected, ['b']);
   });
 });
