@@ -529,3 +529,45 @@ body {
 .sort-arrow {
   font-size: 10px;
 }
+
+/* Mobile banner */
+.mobile-banner {
+  display: none;
+}
+
+@media (max-width: 950px) {
+  .mobile-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    z-index: 9999;
+    padding: 32px;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .mobile-banner-icon {
+    font-size: 48px;
+  }
+
+  .mobile-banner-title {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .mobile-banner-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    max-width: 300px;
+    line-height: 1.5;
+  }
+
+  body > *:not(.mobile-banner) {
+    display: none !important;
+  }
+}

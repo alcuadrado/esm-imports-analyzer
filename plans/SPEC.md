@@ -686,6 +686,10 @@ The report is a single-page application with four main areas: header, cycles pan
 +-------------------------------------------------------------------+
 ```
 
+### Mobile
+
+The report does not support mobile viewports. When the viewport width is 950px or below, a full-screen banner is shown instead of the report UI. The banner tells the user to open the report on a desktop browser. All other UI elements are hidden via CSS (`display: none !important`), so no JavaScript (Cytoscape, dagre worker, etc.) executes on mobile.
+
 ### 9.1 Graph
 
 #### Node types
@@ -1210,6 +1214,10 @@ Import time includes time spent suspended in top-level `await`. This is technica
 ### Process Must Exit Cleanly
 
 Data is flushed via `beforeExit` and `exit` event handlers. If the process is killed with `SIGKILL` or crashes in a way that skips these handlers, import data may be lost.
+
+### No Mobile Support
+
+The report shows a "desktop only" banner on viewports narrower than 950px. All UI elements are hidden via CSS so no JavaScript executes on mobile.
 
 ### CDN Dependency
 
