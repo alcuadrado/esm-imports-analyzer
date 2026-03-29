@@ -47,8 +47,13 @@ export function generateReport(data: ReportData, outputPath: string): void {
   const cyclesPanelJS = readFileContent(join(uiDir, 'cycles-panel.js'));
   const filtersJS = readFileContent(join(uiDir, 'filters.js'));
 
+  // Read version from package.json
+  const pkg = JSON.parse(readFileContent(join(projectRoot, 'package.json')));
+  const version = pkg.version || '0.0.0';
+
   // Assemble HTML
   let html = template;
+  html = templateReplace(html, '{{VERSION}}', version);
   html = templateReplace(html, '{{STYLES}}', styles);
   html = templateReplace(html, '{{DATA}}', JSON.stringify(data));
   html = templateReplace(html, '{{GRAPH_JS}}', graphJS);

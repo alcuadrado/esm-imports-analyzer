@@ -50,6 +50,13 @@ body {
   color: var(--text-primary);
 }
 
+.header-version {
+  font-size: 14px;
+  font-weight: 400;
+  padding-left: 5px;
+  color: var(--text-secondary);
+}
+
 .header-meta {
   font-size: 12px;
   color: var(--text-secondary);
