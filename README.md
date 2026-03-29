@@ -2,7 +2,7 @@
 
 A CLI tool that captures all ESM imports during a Node.js application's execution and generates a self-contained HTML report with an interactive dependency graph and timing data.
 
-![ESM Imports Analyzer](screenshot.png)
+[![Live demo](screenshot.png)](https://alcuadrado.github.io/esm-imports-analyzer/)
 
 [Live demo](https://alcuadrado.github.io/esm-imports-analyzer/)
 
